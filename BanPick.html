@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ban & Pick — CS2 HUD</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #070c1a;
+            --bg-secondary: #0d1628;
+            --bg-card: #111d35;
+            --bg-card-alt: #152240;
+            --ct-blue: #3b82f6;
+            --ct-blue-dim: #1d4ed8;
+            --ct-glow: rgba(59, 130, 246, 0.12);
+            --t-orange: #f59e0b;
+            --t-orange-dim: #d97706;
+            --t-glow: rgba(245, 158, 11, 0.12);
+            --accent-gold: #ffd700;
+            --accent-green: #10b981;
+            --text-primary: #f0f4ff;
+            --text-secondary: #8899c0;
+            --text-muted: #5a6e96;
+            --border-color: #1e3055;
+            --border-light: #2a4078;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.5);
+            --shadow-lg: 0 8px 48px rgba(0, 0, 0, 0.6);
+            --radius-sm: 6px;
+            --radius: 12px;
+            --radius-lg: 20px;
+            --font-body: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            --font-display: 'Rajdhani', 'Inter', sans-serif;
+            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%; height: 100%; overflow: hidden;
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+        }
+        .screen {
+            position: relative;
+            width: 100vw; height: 100vh;
+            aspect-ratio: 16 / 9;
+            max-width: 100%; max-height: 100%;
+            margin: 0 auto;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background:
+                radial-gradient(ellipse 60% 50% at 50% 30%, rgba(11, 22, 56, 0.5) 0%, transparent 70%),
+                radial-gradient(ellipse 40% 30% at 20% 80%, rgba(59, 130, 246, 0.05) 0%, transparent 70%),
+                radial-gradient(ellipse 40% 30% at 80% 80%, rgba(245, 158, 11, 0.05) 0%, transparent 70%),
+                linear-gradient(180deg, #070c1a 0%, #0b1428 50%, #070c1a 100%);
+            padding: 2vh 4vw;
+        }
+        .screen::before {
+            content: '';
+            position: absolute; inset: 0;
+            background-image:
+                linear-gradient(rgba(30, 48, 85, 0.12) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(30, 48, 85, 0.12) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none; z-index: 0;
+        }
+        .screen > * { position: relative; z-index: 1; }
+
+        .content {
+            width: 100%; max-width: 1400px; max-height: 100%;
+            display: flex; flex-direction: column;
+            align-items: center; gap: 1.2vh;
+            height: 100%;
+        }
+
+        /* ===== Title ===== */
+        .bp-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(0.9rem, 1.3vw, 1.5rem);
+            letter-spacing: 0.5em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            transition: opacity 0.3s;
+        }
+        .bp-title .highlight { color: var(--accent-gold); letter-spacing: 0.15em; }
+
+        /* ===== Team Row (just colors, no CT/T) ===== */
+        .team-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5vw;
+            width: 100%;
+            flex-shrink: 0;
+            transition: opacity 0.3s;
+        }
+        .team-box {
+            flex: 1; max-width: 500px;
+            display: flex; align-items: center;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 1.2vh 1.5vw;
+            box-shadow: var(--shadow-md);
+            position: relative; overflow: hidden;
+            transition: transform var(--transition);
+        }
+        .team-box::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0;
+            height: 3px;
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+        .team-box.team1::before { background: var(--ct-blue); }
+        .team-box.team2::before { background: var(--t-orange); }
+        .team-box.team1 { box-shadow: var(--shadow-md), inset 0 0 50px var(--ct-glow); }
+        .team-box.team2 { box-shadow: var(--shadow-md), inset 0 0 50px var(--t-glow); }
+
+        .team-name-input {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(1.2rem, 2vw, 2.4rem);
+            text-align: center;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--border-color);
+            color: var(--text-primary);
+            width: 100%;
+            padding: 0.1em 0.2em;
+            outline: none;
+        }
+        .team-box.team1 .team-name-input:focus { border-bottom-color: var(--ct-blue); }
+        .team-box.team2 .team-name-input:focus { border-bottom-color: var(--t-orange); }
+        .team-name-input::placeholder { color: var(--text-muted); }
+
+        .vs-text {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(1rem, 1.5vw, 2rem);
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
+        /* ===== Maps Container ===== */
+        .maps-container {
+            flex: 1;
+            width: 100%;
+            display: flex; flex-direction: column;
+            gap: 0.7vh;
+            overflow-y: auto;
+            min-height: 0;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+            padding-right: 4px;
+            transition: opacity 0.3s;
+        }
+        .maps-container::-webkit-scrollbar { width: 4px; }
+        .maps-container::-webkit-scrollbar-track { background: transparent; }
+        .maps-container::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 2px; }
+
+        /* ===== Map Row ===== */
+        .map-row {
+            position: relative;
+            flex-shrink: 0;
+            height: 9.5vh;
+            min-height: 54px;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background-size: cover;
+            background-position: center 30%;
+            box-shadow: var(--shadow-sm);
+            cursor: default;
+            transition: opacity 0.5s ease, filter var(--transition);
+            border: 1px solid var(--border-color);
+        }
+        .map-row.hidden-map {
+            opacity: 0 !important;
+            pointer-events: none;
+        }
+        /* Dark gradient overlay for readability */
+        .map-row::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(135deg,
+                rgba(7,12,26,0.88) 0%,
+                rgba(7,12,26,0.40) 45%,
+                rgba(7,12,26,0.15) 70%,
+                rgba(7,12,26,0.05) 100%
+            );
+            z-index: 1;
+            pointer-events: none;
+            transition: background var(--transition);
+        }
+        .map-row > * { position: relative; z-index: 2; }
+
+        /* Banned */
+        .map-row.banned { filter: grayscale(1); opacity: 0.55; border-color: #333; }
+        .map-row.banned::before {
+            background: linear-gradient(135deg,
+                rgba(7,12,26,0.95) 0%,
+                rgba(7,12,26,0.70) 60%,
+                rgba(7,12,26,0.40) 100%
+            );
+        }
+        /* Decider */
+        .map-row.decider {
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.05), inset 0 0 40px rgba(255, 215, 0, 0.03);
+        }
+
+        .map-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 100%;
+            padding: 0 1vw 0 1.5vw;
+        }
+
+        /* Left: map name */
+        .map-name-section { display: flex; align-items: center; gap: 1em; }
+        .map-name {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(1rem, 1.6vw, 1.9rem);
+            color: var(--text-primary);
+            letter-spacing: 0.05em;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.7);
+        }
+        .map-subname {
+            font-size: clamp(0.5rem, 0.6vw, 0.7rem);
+            color: var(--text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        /* Right: glass panel */
+        .map-right {
+            display: flex;
+            align-items: center;
+            gap: 0.6em;
+            background: rgba(7, 12, 26, 0.65);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(255,255,255,0.05);
+            padding: 0.35em 0.7em;
+            max-width: 75%;
+        }
+        .map-status { display: flex; align-items: center; gap: 0.4em; flex-wrap: wrap; }
+        .status-tag {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: clamp(0.5rem, 0.6vw, 0.75rem);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.2em 0.7em;
+            border-radius: 999px;
+            white-space: nowrap;
+            border: 1px solid;
+        }
+        .status-tag.banned {
+            background: rgba(100, 100, 120, 0.15);
+            color: var(--text-muted);
+            border-color: rgba(100, 100, 120, 0.2);
+        }
+        .status-tag.picked-info {
+            background: rgba(255,255,255,0.06);
+            color: var(--text-secondary);
+            border-color: rgba(255,255,255,0.08);
+        }
+        .status-tag.side-ct {  /* CT = blue on the map */
+            background: rgba(59, 130, 246, 0.12);
+            color: var(--ct-blue);
+            border-color: rgba(59, 130, 246, 0.2);
+        }
+        .status-tag.side-t {  /* T = orange on the map */
+            background: rgba(245, 158, 11, 0.12);
+            color: var(--t-orange);
+            border-color: rgba(245, 158, 11, 0.2);
+        }
+        .status-tag.decider-tag {
+            background: rgba(255, 215, 0, 0.1);
+            color: var(--accent-gold);
+            border-color: rgba(255, 215, 0, 0.2);
+        }
+
+        .map-actions {
+            display: flex;
+            gap: 0.4em;
+            flex-shrink: 0;
+        }
+        .action-btn {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(0.48rem, 0.6vw, 0.72rem);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 0.25em 0.8em;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all var(--transition);
+            border: 1.5px solid;
+            background: rgba(0,0,0,0.35);
+            backdrop-filter: blur(4px);
+            white-space: nowrap;
+        }
+        .action-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .action-btn:active { transform: translateY(0); }
+        .action-btn.ban-btn {
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.35);
+        }
+        .action-btn.ban-btn:hover {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+        .action-btn.pick-btn {
+            color: var(--accent-green);
+            border-color: rgba(16, 185, 129, 0.35);
+        }
+        .action-btn.pick-btn:hover {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.5);
+        }
+
+        /* ===== Bottom Bar ===== */
+        .bottom-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            flex-shrink: 0;
+            gap: 1em;
+            padding-top: 0.5vh;
+            transition: opacity 0.3s;
+        }
+        .bp-stats {
+            display: flex;
+            gap: 1.5em;
+            font-size: clamp(0.5rem, 0.65vw, 0.8rem);
+            color: var(--text-muted);
+            font-family: var(--font-display);
+            letter-spacing: 0.05em;
+        }
+        .bp-stats span { display: flex; align-items: center; gap: 0.4em; }
+        .bp-stats .num { font-weight: 700; font-size: 1.2em; }
+        .bp-stats .num.t1-color { color: var(--ct-blue); }
+        .bp-stats .num.t2-color { color: var(--t-orange); }
+
+        .play-btn {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(0.6rem, 0.8vw, 0.95rem);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            padding: 0.5em 2em;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all var(--transition);
+            border: 2px solid var(--accent-gold);
+            background: transparent;
+            color: var(--accent-gold);
+            white-space: nowrap;
+        }
+        .play-btn:hover:not(:disabled) {
+            background: var(--accent-gold);
+            color: #000;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.15);
+        }
+        .play-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            border-color: var(--text-muted);
+            color: var(--text-muted);
+        }
+
+        /* ===== Dialog Overlay ===== */
+        .dialog-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(6px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .dialog-overlay.open { display: flex; }
+        .dialog-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: 2.5vh 3vw;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+            animation: dialogIn 0.25s ease;
+        }
+        @keyframes dialogIn {
+            from { opacity: 0; transform: scale(0.92) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .dialog-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(1rem, 1.5vw, 1.8rem);
+            color: var(--text-primary);
+            margin-bottom: 0.3em;
+            letter-spacing: 0.05em;
+        }
+        .dialog-sub {
+            font-size: clamp(0.7rem, 0.85vw, 1rem);
+            color: var(--text-secondary);
+            margin-bottom: 1.5em;
+        }
+        .dialog-options { display: flex; gap: 1em; justify-content: center; }
+        .dialog-opt-btn {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(0.7rem, 0.9vw, 1.1rem);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 0.7em 1.8em;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all var(--transition);
+            border: 2px solid;
+            background: rgba(0,0,0,0.3);
+            min-width: 120px;
+        }
+        .dialog-opt-btn.t1-clr {
+            color: var(--ct-blue);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+        .dialog-opt-btn.t1-clr:hover {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: var(--ct-blue);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.1);
+        }
+        .dialog-opt-btn.t2-clr {
+            color: var(--t-orange);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+        .dialog-opt-btn.t2-clr:hover {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: var(--t-orange);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.1);
+        }
+        .dialog-cancel-btn {
+            margin-top: 1.2em;
+            font-family: var(--font-body);
+            font-size: clamp(0.6rem, 0.7vw, 0.85rem);
+            color: var(--text-muted);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.4em 1em;
+            transition: color var(--transition);
+        }
+        .dialog-cancel-btn:hover { color: var(--text-secondary); }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            .screen { padding: 1.5vh 3vw; }
+            .content { gap: 1vh; }
+            .team-box { padding: 0.8vh 2vw; }
+            .map-row { height: 8vh; min-height: 44px; }
+            .map-content { padding: 0 1vw 0 2vw; }
+            .map-right { padding: 0.2em 0.4em; }
+            .action-btn { padding: 0.15em 0.5em; }
+            .dialog-box { padding: 2vh 4vw; }
+            .dialog-opt-btn { padding: 0.5em 1.2em; min-width: 90px; }
+        }
+        @media (max-height: 600px) {
+            .map-row { height: 10vh; }
+            .team-box { padding: 0.4vh 1vw; }
+            .bp-title { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="screen">
+        <div class="content">
+
+            <!-- Title -->
+            <div class="bp-title">
+                BAN & <span class="highlight">PICK</span>
+            </div>
+
+            <!-- Teams — just team identity colors -->
+            <div class="team-row">
+                <div class="team-box team1">
+                    <input type="text" id="team1-input" class="team-name-input" placeholder="Team 1" value="Team Liquid" />
+                </div>
+                <div class="vs-text">VS</div>
+                <div class="team-box team2">
+                    <input type="text" id="team2-input" class="team-name-input" placeholder="Team 2" value="NAVI" />
+                </div>
+            </div>
+
+            <!-- Maps Container -->
+            <div class="maps-container" id="mapsContainer"></div>
+
+            <!-- Bottom Bar -->
+            <div class="bottom-bar">
+                <div class="bp-stats">
+                    <span>Bans: <span class="num" id="banCount">0</span></span>
+                    <span>Picks: <span class="num" id="pickCount">0</span></span>
+                    <span style="color:var(--text-muted)">·</span>
+                    <span><span class="num t1-color" id="t1PickCount">0</span> picked</span>
+                    <span><span class="num t2-color" id="t2PickCount">0</span> picked</span>
+                </div>
+                <button class="play-btn" id="playBtn" disabled>▶ PLAY SEQUENCE</button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Dialog Overlay -->
+    <div class="dialog-overlay" id="dialogOverlay">
+        <div class="dialog-box">
+            <div class="dialog-title" id="dialogTitle">Select</div>
+            <div class="dialog-sub" id="dialogSub">Choose an option</div>
+            <div class="dialog-options" id="dialogOptions">
+                <button class="dialog-opt-btn t1-clr" data-result='{"team":1}'>Team 1</button>
+                <button class="dialog-opt-btn t2-clr" data-result='{"team":2}'>Team 2</button>
+            </div>
+            <button class="dialog-cancel-btn" id="dialogCancel">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ===== Configuration =====
+            const MAPS = [
+                { id: 'de_dust2',   name: 'Dust 2',  file: 'de_dust2.png' },
+                { id: 'de_mirage',  name: 'Mirage',  file: 'de_mirage.png' },
+                { id: 'de_inferno', name: 'Inferno', file: 'de_inferno.png' },
+                { id: 'de_anubis',  name: 'Anubis',  file: 'de_anubis.png' },
+                { id: 'de_overpass',name: 'Overpass',file: 'de_overpass.png' },
+                { id: 'de_nuke',    name: 'Nuke',    file: 'de_nuke.png' },
+                { id: 'de_ancient', name: 'Ancient', file: 'de_ancient.png' },
+            ];
+            const IMG_PATH = 'res/';
+
+            // ===== State =====
+            const M = {};
+            MAPS.forEach(m => { M[m.id] = { banned: null, picked: null, ctTeam: null }; });
+            const timeline = [];
+
+            // ===== DOM =====
+            const $ = id => document.getElementById(id);
+            const mapsContainer = $('mapsContainer');
+            const dialogOverlay = $('dialogOverlay');
+            const dialogOptions = $('dialogOptions');
+            const dialogCancel = $('dialogCancel');
+            const playBtn = $('playBtn');
+            const banCountEl = $('banCount');
+            const pickCountEl = $('pickCount');
+            const t1PickCountEl = $('t1PickCount');
+            const t2PickCountEl = $('t2PickCount');
+            const t1Input = $('team1-input');
+            const t2Input = $('team2-input');
+
+            function tn(team) { return (team === 1 ? t1Input : t2Input).value.trim() || (team === 1 ? 'Team 1' : 'Team 2'); }
+            function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+            // ===== Dialog =====
+            let dialogResolve = null;
+            function openDialog(title, sub, opt1, opt2) {
+                return new Promise(resolve => {
+                    $('dialogTitle').textContent = title;
+                    $('dialogSub').textContent = sub;
+                    const bs = dialogOptions.querySelectorAll('.dialog-opt-btn');
+                    bs[0].textContent = opt1.label;
+                    bs[0].dataset.result = JSON.stringify(opt1.result);
+                    bs[0].className = 'dialog-opt-btn ' + (opt1.cls || 't1-clr');
+                    bs[1].textContent = opt2.label;
+                    bs[1].dataset.result = JSON.stringify(opt2.result);
+                    bs[1].className = 'dialog-opt-btn ' + (opt2.cls || 't2-clr');
+                    dialogResolve = resolve;
+                    dialogOverlay.classList.add('open');
+                });
+            }
+            dialogOptions.addEventListener('click', e => {
+                const b = e.target.closest('.dialog-opt-btn');
+                if (!b || !dialogResolve) return;
+                dialogOverlay.classList.remove('open');
+                const r = JSON.parse(b.dataset.result);
+                const fn = dialogResolve; dialogResolve = null;
+                fn(r);
+            });
+            dialogCancel.addEventListener('click', () => {
+                if (!dialogResolve) return;
+                dialogOverlay.classList.remove('open');
+                const fn = dialogResolve; dialogResolve = null;
+                fn(null);
+            });
+
+            // ===== Render maps =====
+            function renderMaps() {
+                mapsContainer.innerHTML = '';
+                MAPS.forEach(m => {
+                    const row = document.createElement('div');
+                    row.className = 'map-row hidden-map';
+                    row.id = 'map-' + m.id;
+                    row.style.backgroundImage = `url(${IMG_PATH}${m.file})`;
+
+                    const c = document.createElement('div');
+                    c.className = 'map-content';
+
+                    const ns = document.createElement('div');
+                    ns.className = 'map-name-section';
+                    ns.innerHTML = `<div><div class="map-name">${m.name}</div><div class="map-subname">${m.id}</div></div>`;
+                    c.appendChild(ns);
+
+                    const right = document.createElement('div');
+                    right.className = 'map-right';
+                    const sd = document.createElement('div');
+                    sd.className = 'map-status';
+                    sd.id = 'status-' + m.id;
+                    right.appendChild(sd);
+                    const ad = document.createElement('div');
+                    ad.className = 'map-actions';
+                    ad.id = 'actions-' + m.id;
+                    right.appendChild(ad);
+                    c.appendChild(right);
+
+                    row.appendChild(c);
+                    mapsContainer.appendChild(row);
+                });
+                // Show all maps initially
+                document.querySelectorAll('.map-row').forEach(r => r.classList.remove('hidden-map'));
+                updateAll();
+            }
+
+            // ===== Update display =====
+            function updateMap(mapId) {
+                const s = M[mapId];
+                const row = $('map-' + mapId);
+                const st = $('status-' + mapId);
+                const ac = $('actions-' + mapId);
+                if (!row || !st) return;
+
+                st.innerHTML = '';
+                row.className = 'map-row';
+                ac.innerHTML = '';
+
+                if (s.banned !== null) {
+                    row.classList.add('banned');
+                    const tag = document.createElement('span');
+                    tag.className = 'status-tag banned';
+                    tag.textContent = `BANNED ${tn(s.banned)}`;
+                    st.appendChild(tag);
+                } else if (s.picked !== null) {
+                    row.classList.add('picked');
+                    const pi = document.createElement('span');
+                    pi.className = 'status-tag picked-info';
+                    pi.textContent = `PICK ${tn(s.picked)}`;
+                    st.appendChild(pi);
+                    if (s.ctTeam !== null) {
+                        const ct = s.ctTeam;
+                        const t = ct === 1 ? 2 : 1;
+                        // CT = blue on this map
+                        const ctTag = document.createElement('span');
+                        ctTag.className = 'status-tag side-ct';
+                        ctTag.textContent = `${tn(ct)} CT`;
+                        st.appendChild(ctTag);
+                        // T = orange on this map
+                        const tTag = document.createElement('span');
+                        tTag.className = 'status-tag side-t';
+                        tTag.textContent = `${tn(t)} T`;
+                        st.appendChild(tTag);
+                        // Change side button
+                        const sb = document.createElement('button');
+                        sb.className = 'action-btn pick-btn';
+                        sb.textContent = '⇄ CT';
+                        sb.style.fontSize = 'clamp(0.42rem, 0.5vw, 0.62rem)';
+                        sb.addEventListener('click', e => { e.stopPropagation(); doSide(mapId); });
+                        ac.appendChild(sb);
+                    } else {
+                        const sb = document.createElement('button');
+                        sb.className = 'action-btn pick-btn';
+                        sb.textContent = 'SET CT';
+                        sb.addEventListener('click', e => { e.stopPropagation(); doSide(mapId); });
+                        ac.appendChild(sb);
+                    }
+                } else {
+                    const bb = document.createElement('button');
+                    bb.className = 'action-btn ban-btn';
+                    bb.textContent = 'BAN';
+                    bb.addEventListener('click', e => { e.stopPropagation(); doBan(mapId); });
+                    const pb = document.createElement('button');
+                    pb.className = 'action-btn pick-btn';
+                    pb.textContent = 'PICK';
+                    pb.addEventListener('click', e => { e.stopPropagation(); doPick(mapId); });
+                    ac.appendChild(bb);
+                    ac.appendChild(pb);
+                }
+
+                // Decider
+                const unmarked = MAPS.filter(m => M[m.id].banned === null && M[m.id].picked === null);
+                if (unmarked.length === 1 && unmarked[0].id === mapId) {
+                    row.classList.add('decider');
+                    if (!st.querySelector('.decider-tag')) {
+                        const dt = document.createElement('span');
+                        dt.className = 'status-tag decider-tag';
+                        dt.textContent = 'DECIDER';
+                        st.appendChild(dt);
+                    }
+                    ac.innerHTML = '';
+                }
+            }
+
+            function updateAll() {
+                MAPS.forEach(m => updateMap(m.id));
+                updateStats();
+            }
+
+            function updateStats() {
+                let bans = 0, picks = 0, t1p = 0, t2p = 0;
+                MAPS.forEach(m => {
+                    const s = M[m.id];
+                    if (s.banned !== null) bans++;
+                    if (s.picked !== null) { picks++; s.picked === 1 ? t1p++ : t2p++; }
+                });
+                banCountEl.textContent = bans;
+                pickCountEl.textContent = picks;
+                t1PickCountEl.textContent = t1p;
+                t2PickCountEl.textContent = t2p;
+                playBtn.disabled = timeline.length === 0;
+            }
+
+            // ===== Actions =====
+            async function doBan(mapId) {
+                const r = await openDialog(
+                    'BAN',
+                    `Which team bans ${MAPS.find(m => m.id === mapId).name}?`,
+                    { label: tn(1), result: { team: 1 }, cls: 't1-clr' },
+                    { label: tn(2), result: { team: 2 }, cls: 't2-clr' }
+                );
+                if (!r) return;
+                M[mapId].banned = r.team;
+                timeline.push({ mapId, action: 'ban', team: r.team });
+                updateMap(mapId);
+                updateStats();
+            }
+
+            async function doPick(mapId) {
+                const r = await openDialog(
+                    'PICK',
+                    `Which team picks ${MAPS.find(m => m.id === mapId).name}?`,
+                    { label: tn(1), result: { team: 1 }, cls: 't1-clr' },
+                    { label: tn(2), result: { team: 2 }, cls: 't2-clr' }
+                );
+                if (!r) return;
+                M[mapId].picked = r.team;
+                timeline.push({ mapId, action: 'pick', team: r.team });
+                updateMap(mapId);
+                updateStats();
+                await doSide(mapId);
+            }
+
+            async function doSide(mapId) {
+                const s = M[mapId];
+                if (s.picked === null) return;
+                const r = await openDialog(
+                    'CT SIDE',
+                    `Who starts as CT on ${MAPS.find(m => m.id === mapId).name}?`,
+                    { label: tn(1), result: { team: 1 }, cls: 't1-clr' },
+                    { label: tn(2), result: { team: 2 }, cls: 't2-clr' }
+                );
+                if (!r) return;
+                M[mapId].ctTeam = r.team;
+                const picks = timeline.filter(e => e.mapId === mapId && e.action === 'pick');
+                if (picks.length) picks[picks.length - 1].ctTeam = r.team;
+                timeline.push({ mapId, action: 'side', team: r.team });
+                updateMap(mapId);
+                updateStats();
+            }
+
+            // ===== Play — in-place animation =====
+            playBtn.addEventListener('click', startAnim);
+
+            async function startAnim() {
+                playBtn.disabled = true;
+
+                // Build BP order: each map appears once, in first-touched order
+                const order = [];
+                const seen = new Set();
+                timeline.forEach(e => {
+                    if (!seen.has(e.mapId)) {
+                        seen.add(e.mapId);
+                        order.push(e.mapId);
+                    }
+                });
+                MAPS.forEach(m => {
+                    if (!seen.has(m.id)) order.push(m.id);
+                });
+
+                // Hide bottom bar
+                document.querySelector('.bottom-bar').style.opacity = '0';
+
+                // Hide all map rows
+                document.querySelectorAll('.map-row').forEach(r => r.classList.add('hidden-map'));
+                await delay(500);
+
+                // Show them one by one in BP order (team names & grid stay visible)
+                for (const mapId of order) {
+                    await delay(600);
+                    const row = $('map-' + mapId);
+                    if (row) row.classList.remove('hidden-map');
+                }
+                // Done — no button, no overlay, user refreshes to reset
+            }
+
+            // ===== Init =====
+            renderMaps();
+            t1Input.addEventListener('input', updateAll);
+            t2Input.addEventListener('input', updateAll);
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault();
+            });
+
+        })();
+    </script>
+</body>
+</html>

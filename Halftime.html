@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Half Time — CS2 HUD</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ===== Design System ===== */
+        :root {
+            --bg-primary: #070c1a;
+            --bg-secondary: #0d1628;
+            --bg-card: #111d35;
+            --bg-card-alt: #152240;
+            --ct-blue: #3b82f6;
+            --ct-blue-dim: #1d4ed8;
+            --ct-glow: rgba(59, 130, 246, 0.15);
+            --t-orange: #f59e0b;
+            --t-orange-dim: #d97706;
+            --t-glow: rgba(245, 158, 11, 0.15);
+            --accent-gold: #ffd700;
+            --text-primary: #f0f4ff;
+            --text-secondary: #8899c0;
+            --text-muted: #5a6e96;
+            --border-color: #1e3055;
+            --border-light: #2a4078;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.5);
+            --shadow-lg: 0 8px 48px rgba(0, 0, 0, 0.6);
+            --radius-sm: 6px;
+            --radius: 12px;
+            --radius-lg: 20px;
+            --font-body: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            --font-display: 'Rajdhani', 'Inter', sans-serif;
+            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* ===== Reset ===== */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===== 16:9 Container ===== */
+        .screen {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            aspect-ratio: 16 / 9;
+            max-width: 100%;
+            max-height: 100%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background:
+                radial-gradient(ellipse 60% 50% at 50% 40%, rgba(11, 22, 56, 0.6) 0%, transparent 70%),
+                radial-gradient(ellipse 40% 30% at 20% 80%, rgba(59, 130, 246, 0.04) 0%, transparent 70%),
+                radial-gradient(ellipse 40% 30% at 80% 80%, rgba(245, 158, 11, 0.04) 0%, transparent 70%),
+                linear-gradient(180deg, #070c1a 0%, #0b1428 50%, #070c1a 100%);
+            padding: 3vh 4vw;
+        }
+
+        /* subtle grid overlay */
+        .screen::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(30, 48, 85, 0.15) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(30, 48, 85, 0.15) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .screen > * { position: relative; z-index: 1; }
+
+        /* ===== Layout ===== */
+        .content {
+            width: 100%;
+            max-width: 1500px;
+            max-height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3vh;
+        }
+
+        /* ===== HALF TIME Header ===== */
+        .halftime-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(2rem, 4.5vw, 4.5rem);
+            letter-spacing: 0.45em;
+            text-transform: uppercase;
+            text-align: center;
+            color: transparent;
+            background: linear-gradient(90deg, var(--text-secondary), var(--text-primary), var(--text-secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            line-height: 1.2;
+            margin-bottom: 0.5rem;
+        }
+        .halftime-title .deco {
+            display: inline-block;
+            color: var(--accent-gold);
+            background: none;
+            -webkit-background-clip: unset;
+            background-clip: unset;
+            font-weight: 500;
+        }
+        .halftime-subtitle {
+            font-family: var(--font-display);
+            font-weight: 500;
+            font-size: clamp(0.75rem, 1vw, 1.1rem);
+            letter-spacing: 0.6em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        /* ===== Teams Row ===== */
+        .teams-row {
+            display: flex;
+            align-items: stretch;
+            gap: 2.5vw;
+            width: 100%;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* ===== Team Card ===== */
+        .team-card {
+            flex: 1;
+            max-width: 500px;
+            min-width: 0;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 3vh 2.5vw;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5em;
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+            transition: transform var(--transition), box-shadow var(--transition);
+        }
+        .team-card:hover {
+            transform: translateY(-2px);
+        }
+        .team-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+        .team-card.ct::before { background: var(--ct-blue); }
+        .team-card.t::before  { background: var(--t-orange); }
+
+        .team-card.ct { box-shadow: var(--shadow-md), inset 0 0 60px var(--ct-glow); }
+        .team-card.t  { box-shadow: var(--shadow-md), inset 0 0 60px var(--t-glow); }
+
+        /* side badge */
+        .side-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4em;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(0.65rem, 0.9vw, 1rem);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            padding: 0.2em 0.8em;
+            border-radius: 999px;
+            line-height: 1.6;
+        }
+        .team-card.ct .side-badge {
+            color: var(--ct-blue);
+            background: rgba(59, 130, 246, 0.12);
+        }
+        .team-card.t .side-badge {
+            color: var(--t-orange);
+            background: rgba(245, 158, 11, 0.12);
+        }
+
+        /* team name */
+        .team-name {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(1.3rem, 2.5vw, 2.8rem);
+            text-align: center;
+            width: 100%;
+        }
+        .team-name-input {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(1.3rem, 2.5vw, 2.8rem);
+            text-align: center;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--border-color);
+            color: var(--text-primary);
+            width: 100%;
+            padding: 0.1em 0.2em;
+            outline: none;
+            transition: border-color var(--transition);
+        }
+        .team-name-input:focus {
+            border-bottom-color: var(--text-secondary);
+        }
+        .team-card.ct .team-name-input:focus { border-bottom-color: var(--ct-blue); }
+        .team-card.t .team-name-input:focus  { border-bottom-color: var(--t-orange); }
+        .team-name-input::placeholder { color: var(--text-muted); }
+
+        .team-name-display {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(1rem, 2vw, 2.2rem);
+            text-align: center;
+        }
+
+        /* score */
+        .team-score {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(3.5rem, 7vw, 7rem);
+            line-height: 1;
+            text-align: center;
+        }
+        .team-card.ct .team-score { color: var(--ct-blue); }
+        .team-card.t .team-score  { color: var(--t-orange); }
+
+        .team-score-input {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(3.5rem, 7vw, 7rem);
+            line-height: 1;
+            text-align: center;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid var(--border-color);
+            color: inherit;
+            width: 5rem;
+            max-width: 60%;
+            padding: 0;
+            outline: none;
+            transition: border-color var(--transition);
+        }
+        .team-card.ct .team-score-input { color: var(--ct-blue); }
+        .team-card.t .team-score-input  { color: var(--t-orange); }
+        .team-card.ct .team-score-input:focus { border-bottom-color: var(--ct-blue); }
+        .team-card.t .team-score-input:focus  { border-bottom-color: var(--t-orange); }
+
+        .team-score-display {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(3rem, 6vw, 6rem);
+            line-height: 1;
+        }
+        .team-card.ct .team-score-display { color: var(--ct-blue); }
+        .team-card.t .team-score-display  { color: var(--t-orange); }
+
+        /* vs divider */
+        .vs-divider {
+            display: flex;
+            align-items: center;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(1rem, 1.8vw, 2rem);
+            color: var(--text-muted);
+            padding: 0 0.3vw;
+            flex-shrink: 0;
+        }
+
+        /* ===== Map Info Bar ===== */
+        .map-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6em 1.5em;
+            flex-wrap: wrap;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 0.8vh 2vw;
+            width: 100%;
+            max-width: 800px;
+            box-shadow: var(--shadow-sm);
+        }
+        .map-info-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+            font-size: clamp(0.85rem, 1.1vw, 1.25rem);
+            color: var(--text-secondary);
+        }
+        .map-info-item .label {
+            color: var(--text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.8em;
+        }
+        .map-info-input {
+            background: transparent;
+            border: none;
+            border-bottom: 1.5px solid var(--border-color);
+            color: var(--text-primary);
+            font-size: inherit;
+            font-family: inherit;
+            padding: 0.1em 0.3em;
+            min-width: 60px;
+            outline: none;
+            transition: border-color var(--transition);
+        }
+        .map-info-input:focus { border-bottom-color: var(--text-secondary); }
+        .map-info-input::placeholder { color: var(--text-muted); }
+
+        .map-info-display {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .map-info-display .highlight {
+            color: var(--accent-gold);
+            font-weight: 600;
+        }
+
+        /* ===== Timer ===== */
+        .timer-section {
+            display: flex;
+            align-items: center;
+            gap: 1.2em;
+            margin-top: 0.5vh;
+        }
+        .timer-display {
+            font-family: 'Rajdhani', 'Inter', monospace;
+            font-weight: 700;
+            font-size: clamp(2.5rem, 4vw, 4.5rem);
+            letter-spacing: 0.08em;
+            color: var(--text-primary);
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 0.15em 0.6em;
+            min-width: 2.8em;
+            text-align: center;
+            line-height: 1.3;
+            transition: color 0.3s, border-color 0.3s;
+        }
+        .timer-display.running { color: var(--accent-gold); border-color: var(--accent-gold); }
+        .timer-display.expired { color: #ef4444; border-color: #ef4444; animation: pulse-red 1s ease-in-out infinite; }
+
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.5; }
+        }
+
+        .timer-input {
+            font-family: 'Rajdhani', 'Inter', monospace;
+            font-weight: 700;
+            font-size: clamp(2.5rem, 4vw, 4.5rem);
+            letter-spacing: 0.08em;
+            color: var(--text-primary);
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 0.15em 0.3em;
+            width: 3em;
+            text-align: center;
+            line-height: 1.3;
+            outline: none;
+            transition: border-color var(--transition);
+        }
+        .timer-input:focus { border-color: var(--text-secondary); }
+
+        .timer-input-label {
+            font-family: var(--font-display);
+            font-size: clamp(0.65rem, 0.8vw, 0.9rem);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-right: -0.5em;
+        }
+
+        .timer-btn {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: clamp(0.75rem, 1vw, 1.1rem);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 0.5em 1.6em;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+            background: var(--bg-card-alt);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+        .timer-btn:hover {
+            background: var(--border-color);
+            color: var(--text-primary);
+        }
+        .timer-btn.start {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: #fff;
+            border-color: #10b981;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.25);
+        }
+        .timer-btn.start:hover {
+            background: linear-gradient(135deg, #047857, #059669);
+            transform: translateY(-1px);
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.35);
+        }
+        .timer-btn.reset {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+            color: #fff;
+            border-color: #ef4444;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+        }
+        .timer-btn.reset:hover {
+            background: linear-gradient(135deg, #b91c1c, #dc2626);
+            transform: translateY(-1px);
+        }
+        .timer-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* ===== Confirm Button ===== */
+        .confirm-btn {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: clamp(0.7rem, 0.9vw, 1rem);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            padding: 0.6em 2.5em;
+            border: 2px solid var(--accent-gold);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: background var(--transition), color var(--transition), box-shadow var(--transition);
+            background: transparent;
+            color: var(--accent-gold);
+            margin-top: 0.5vh;
+        }
+        .confirm-btn:hover {
+            background: var(--accent-gold);
+            color: #000;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.15);
+        }
+
+        /* ===== Utilities ===== */
+        .hidden  { display: none !important; }
+        .fade-in { animation: fadeIn 0.4s ease forwards; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            .screen { padding: 1.5vh 3vw; }
+            .content { gap: 1.5vh; }
+            .teams-row { gap: 1.5vw; }
+            .team-card { padding: 1.5vh 3vw; }
+            .vs-divider { font-size: clamp(1rem, 2vw, 1.5rem); }
+            .timer-section { gap: 0.8em; }
+        }
+
+        /* hide number input spinners */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
+    </style>
+</head>
+<body>
+    <div class="screen">
+        <div class="content">
+
+            <!-- Header -->
+            <div class="halftime-title">
+                <span class="deco">—</span> HALF TIME <span class="deco">—</span>
+            </div>
+            <div class="halftime-subtitle">Sides Switch</div>
+
+            <!-- Teams -->
+            <div class="teams-row">
+
+                <!-- CT Card -->
+                <div class="team-card ct">
+                    <div class="side-badge">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        COUNTER-TERRORIST
+                    </div>
+                    <!-- editable team name -->
+                    <input type="text" id="ct-name-input" class="team-name-input" placeholder="Team CT" value="Team Liquid" data-display="ct-name-display" />
+                    <span id="ct-name-display" class="team-name-display hidden"></span>
+                    <!-- editable score -->
+                    <div class="team-score">
+                        <input type="number" id="ct-score-input" class="team-score-input" min="0" max="12" value="0" data-display="ct-score-display" />
+                        <span id="ct-score-display" class="team-score-display hidden"></span>
+                    </div>
+                </div>
+
+                <!-- VS -->
+                <div class="vs-divider">VS</div>
+
+                <!-- T Card -->
+                <div class="team-card t">
+                    <div class="side-badge">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 L15 9 L22 9 L16 14 L18 21 L12 17 L6 21 L8 14 L2 9 L9 9 Z"/></svg>
+                        TERRORIST
+                    </div>
+                    <!-- editable team name -->
+                    <input type="text" id="t-name-input" class="team-name-input" placeholder="Team T" value="NAVI" data-display="t-name-display" />
+                    <span id="t-name-display" class="team-name-display hidden"></span>
+                    <!-- editable score -->
+                    <div class="team-score">
+                        <input type="number" id="t-score-input" class="team-score-input" min="0" max="12" value="0" data-display="t-score-display" />
+                        <span id="t-score-display" class="team-score-display hidden"></span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Map Info Bar -->
+            <div class="map-info">
+                <div class="map-info-item">
+                    <span class="label">Map</span>
+                    <input type="text" id="map-number-input" class="map-info-input" placeholder="e.g. 1 of 3" value="1 of 3" data-display="map-number-display" style="min-width:50px;" />
+                    <span id="map-number-display" class="map-info-display hidden"></span>
+                </div>
+                <div class="map-info-item">
+                    <span class="label" style="display:none;">—</span>
+                    <span style="color:var(--text-muted)">·</span>
+                </div>
+                <div class="map-info-item">
+                    <input type="text" id="map-name-input" class="map-info-input" placeholder="Map name" value="Inferno" data-display="map-name-display" />
+                    <span id="map-name-display" class="map-info-display hidden"></span>
+                </div>
+                <div class="map-info-item">
+                    <span style="color:var(--text-muted)">·</span>
+                </div>
+                <div class="map-info-item">
+                    <span class="label">Picked by</span>
+                    <input type="text" id="map-picker-input" class="map-info-input" placeholder="Team" value="Team Liquid" data-display="map-picker-display" />
+                    <span id="map-picker-display" class="map-info-display hidden"></span>
+                </div>
+            </div>
+
+            <!-- Timer -->
+            <div class="timer-section">
+                <span class="timer-input-label">Timer</span>
+                <div id="timer-display" class="timer-display">03:00</div>
+                <input type="number" id="timer-input" class="timer-input hidden" min="1" max="99" value="3" />
+                <button id="timer-start-btn" class="timer-btn start">▶ Start</button>
+                <button id="timer-reset-btn" class="timer-btn reset hidden">⟳ Reset</button>
+            </div>
+
+            <!-- Confirm -->
+            <button id="confirm-btn" class="confirm-btn">✦ CONFIRM</button>
+
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            /* ---- Confirmation Logic ---- */
+            const confirmBtn = document.getElementById('confirm-btn');
+
+            /* ---- Timer Logic ---- */
+            const timerDisplay = document.getElementById('timer-display');
+            const timerInput   = document.getElementById('timer-input');
+            const startBtn     = document.getElementById('timer-start-btn');
+            const resetBtn     = document.getElementById('timer-reset-btn');
+
+            let countdownInterval = null;
+            let remainingSeconds  = 180; // 3 min default
+            let isRunning         = false;
+
+            function formatTime(sec) {
+                const m = Math.floor(sec / 60);
+                const s = sec % 60;
+                return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+            }
+
+            function updateTimerDisplay() {
+                timerDisplay.textContent = formatTime(remainingSeconds);
+            }
+
+            function stopTimer() {
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                }
+                isRunning = false;
+                timerDisplay.classList.remove('running', 'expired');
+                startBtn.textContent = '▶ Start';
+                startBtn.className = 'timer-btn start';
+                startBtn.disabled = false;
+            }
+
+            function startTimer() {
+                if (isRunning) return;
+
+                // if timer is already expired, reset first
+                if (remainingSeconds <= 0) {
+                    const minsInput = timerInput.value ? parseInt(timerInput.value, 10) : 3;
+                    remainingSeconds = (minsInput || 3) * 60;
+                    updateTimerDisplay();
+                }
+
+                isRunning = true;
+                timerDisplay.classList.remove('expired');
+                timerDisplay.classList.add('running');
+                startBtn.textContent = '⏸ Pause';
+                startBtn.className = 'timer-btn';
+                resetBtn.classList.remove('hidden');
+
+                countdownInterval = setInterval(function() {
+                    remainingSeconds--;
+                    updateTimerDisplay();
+
+                    if (remainingSeconds <= 0) {
+                        remainingSeconds = 0;
+                        updateTimerDisplay();
+                        stopTimer();
+                        timerDisplay.classList.remove('running');
+                        timerDisplay.classList.add('expired');
+                        startBtn.textContent = '↻ Restart';
+                        startBtn.className = 'timer-btn start';
+                        startBtn.disabled = false;
+                    }
+                }, 1000);
+            }
+
+            function pauseTimer() {
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                }
+                isRunning = false;
+                timerDisplay.classList.remove('running');
+                startBtn.textContent = '▶ Resume';
+                startBtn.className = 'timer-btn start';
+            }
+
+            function resetTimer() {
+                stopTimer();
+                const minsInput = timerInput.value ? parseInt(timerInput.value, 10) : 3;
+                remainingSeconds = (minsInput || 3) * 60;
+                updateTimerDisplay();
+                timerDisplay.classList.remove('expired', 'running');
+                startBtn.textContent = '▶ Start';
+                startBtn.className = 'timer-btn start';
+                resetBtn.classList.add('hidden');
+            }
+
+            startBtn.addEventListener('click', function() {
+                if (remainingSeconds <= 0) {
+                    resetTimer();
+                    return;
+                }
+                if (isRunning) {
+                    pauseTimer();
+                } else {
+                    startTimer();
+                }
+            });
+
+            resetBtn.addEventListener('click', resetTimer);
+
+            // timer input sync — update display when input changes
+            timerInput.addEventListener('input', function() {
+                if (isRunning) return; // don't change while running
+                const mins = parseInt(this.value, 10) || 1;
+                remainingSeconds = mins * 60;
+                updateTimerDisplay();
+            });
+
+            // Show timer input (editable) by default; display hidden until confirm
+            timerDisplay.classList.add('hidden');
+            timerInput.classList.remove('hidden');
+
+            // Confirm: hide all inputs, show display values, lock timer duration
+            const confirmAll = function() {
+                // Read timer input
+                const mins = parseInt(timerInput.value, 10) || 3;
+                remainingSeconds = mins * 60;
+                timerDisplay.textContent = formatTime(remainingSeconds);
+                timerDisplay.classList.remove('hidden');
+                timerInput.classList.add('hidden');
+
+                // Process all other inputs
+                const inputs = document.querySelectorAll('[data-display]');
+                inputs.forEach(function(input) {
+                    const displayId = input.getAttribute('data-display');
+                    const display = document.getElementById(displayId);
+                    if (!display) return;
+                    display.textContent = input.value || input.placeholder || '—';
+                    input.classList.add('hidden');
+                    display.classList.remove('hidden');
+                    display.classList.add('fade-in');
+                });
+
+                confirmBtn.classList.add('hidden');
+            };
+
+            confirmBtn.addEventListener('click', confirmAll);
+
+            // Prevent Enter from submitting forms
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    const target = e.target;
+                    if (target.tagName === 'INPUT') {
+                        e.preventDefault();
+                        // Optionally move focus to next input
+                    }
+                }
+            });
+
+        })();
+    </script>
+</body>
+</html>
