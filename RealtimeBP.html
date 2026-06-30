@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Real-time BP — CS2 HUD</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #070c1a;
+            --bg-secondary: #0d1628;
+            --bg-card: #111d35;
+            --t1-blue: #3b82f6;
+            --t1-glow: rgba(59,130,246,0.12);
+            --t2-orange: #f59e0b;
+            --t2-glow: rgba(245,158,11,0.12);
+            --accent-gold: #ffd700;
+            --accent-green: #10b981;
+            --text-primary: #f0f4ff;
+            --text-secondary: #8899c0;
+            --text-muted: #5a6e96;
+            --border-color: #1e3055;
+            --border-light: #2a4078;
+            --radius-sm: 6px;
+            --radius: 12px;
+            --radius-lg: 20px;
+            --font-body: 'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+            --font-display: 'Rajdhani','Inter',sans-serif;
+            --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font-body);background:var(--bg-primary);color:var(--text-primary);-webkit-font-smoothing:antialiased}
+        .screen{position:relative;width:100vw;height:100vh;aspect-ratio:16/9;max-width:100%;max-height:100%;margin:0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse 60% 50% at 50% 30%,rgba(11,22,56,.5) 0%,transparent 70%),radial-gradient(ellipse 40% 30% at 20% 80%,rgba(59,130,246,.05) 0%,transparent 70%),radial-gradient(ellipse 40% 30% at 80% 80%,rgba(245,158,11,.05) 0%,transparent 70%),linear-gradient(180deg,#070c1a,#0b1428 50%,#070c1a);padding:2vh 4vw}
+        .screen::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(30,48,85,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(30,48,85,.12) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
+        .screen>*{position:relative;z-index:1}
+        .content{width:100%;max-width:1400px;max-height:100%;display:flex;flex-direction:column;align-items:center;gap:1vh;height:100%}
+
+        /* ── Top bar ── */
+        .top-bar{display:flex;align-items:center;justify-content:space-between;width:100%;flex-shrink:0}
+        .admin-btn{font-family:var(--font-display);font-weight:600;font-size:clamp(.5rem,.65vw,.75rem);letter-spacing:.1em;text-transform:uppercase;padding:.25em .7em;border-radius:var(--radius-sm);cursor:pointer;transition:all var(--transition);border:1px solid var(--border-color);background:transparent;color:var(--text-muted)}
+        .admin-btn:hover{background:var(--bg-card);color:var(--text-secondary);border-color:var(--border-light)}
+        .bp-title{font-family:var(--font-display);font-weight:700;font-size:clamp(.7rem,1vw,1.2rem);letter-spacing:.5em;text-transform:uppercase;color:var(--text-muted)}
+        .bp-title .hl{color:var(--accent-gold);letter-spacing:.15em}
+        .bo-badge{font-family:var(--font-display);font-weight:600;font-size:clamp(.5rem,.65vw,.75rem);letter-spacing:.1em;text-transform:uppercase;padding:.2em .7em;border-radius:99px;background:rgba(255,255,255,.04);border:1px solid var(--border-color);color:var(--text-secondary)}
+
+        /* ── Team row ── */
+        .team-row{display:flex;align-items:stretch;justify-content:center;gap:1vw;width:100%;flex-shrink:0;min-height:0}
+        .team-card{flex:1;max-width:480px;background:var(--bg-card);border-radius:var(--radius);padding:1.2vh 1.5vw;display:flex;flex-direction:column;align-items:center;gap:.3em;box-shadow:var(--shadow-md);position:relative;overflow:hidden;border-top:3px solid transparent}
+        .team-card.t1{border-top-color:var(--t1-blue);box-shadow:var(--shadow-md),inset 0 0 50px var(--t1-glow)}
+        .team-card.t2{border-top-color:var(--t2-orange);box-shadow:var(--shadow-md),inset 0 0 50px var(--t2-glow)}
+        .team-name{font-family:var(--font-display);font-weight:700;font-size:clamp(1rem,1.8vw,2.2rem)}
+        .team-card.t1 .team-name{color:var(--t1-blue)}
+        .team-card.t2 .team-name{color:var(--t2-orange)}
+        .team-players{font-size:clamp(.45rem,.55vw,.65rem);color:var(--text-muted);text-align:center}
+        .team-players span{display:inline-block;margin:0 .2em;padding:.05em .4em;border-radius:3px;background:rgba(255,255,255,.03)}
+        .team-action-btn{font-family:var(--font-display);font-weight:700;font-size:clamp(.5rem,.7vw,.85rem);letter-spacing:.12em;text-transform:uppercase;padding:.35em 1.2em;border-radius:var(--radius-sm);cursor:pointer;transition:all var(--transition);border:1.5px solid;background:rgba(0,0,0,.3);margin-top:.3em;min-width:100px}
+        .team-action-btn.t1{color:var(--t1-blue);border-color:rgba(59,130,246,.3)}
+        .team-action-btn.t1:hover{background:rgba(59,130,246,.1);border-color:var(--t1-blue)}
+        .team-action-btn.t2{color:var(--t2-orange);border-color:rgba(245,158,11,.3)}
+        .team-action-btn.t2:hover{background:rgba(245,158,11,.1);border-color:var(--t2-orange)}
+        .team-action-btn:disabled{opacity:.3;cursor:not-allowed}
+        .vs-text{display:flex;align-items:center;font-family:var(--font-display);font-weight:700;font-size:clamp(.8rem,1.2vw,1.5rem);color:var(--text-secondary);flex-shrink:0;padding:0 .3em}
+        .you-badge{font-size:clamp(.4rem,.5vw,.6rem);letter-spacing:.08em;text-transform:uppercase;padding:.15em .5em;border-radius:99px;background:rgba(16,185,129,.12);color:var(--accent-green);border:1px solid rgba(16,185,129,.15)}
+
+        /* ── Spectate / status bar ── */
+        .status-bar{display:flex;align-items:center;gap:.8em;flex-shrink:0;width:100%;justify-content:center}
+        .spectate-btn{font-family:var(--font-display);font-weight:600;font-size:clamp(.5rem,.65vw,.75rem);letter-spacing:.12em;text-transform:uppercase;padding:.3em 1.2em;border-radius:99px;cursor:pointer;transition:all var(--transition);border:1px solid var(--border-color);background:transparent;color:var(--text-secondary)}
+        .spectate-btn:hover{background:var(--bg-card);border-color:var(--border-light)}
+        .spectate-btn.active{background:rgba(255,255,255,.04);border-color:var(--text-secondary);color:var(--text-primary)}
+        .turn-info{font-family:var(--font-display);font-weight:600;font-size:clamp(.55rem,.7vw,.85rem);letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted)}
+        .turn-info .acting{color:var(--accent-green)}
+        .turn-info .t1c{color:var(--t1-blue)}
+        .turn-info .t2c{color:var(--t2-orange)}
+
+        /* ── Maps area ── */
+        .maps-area{flex:1;width:100%;display:flex;flex-direction:column;gap:.5vh;overflow-y:auto;min-height:0;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--border-color) transparent}
+        .maps-area::-webkit-scrollbar{width:4px}
+        .maps-area::-webkit-scrollbar-track{background:transparent}
+        .maps-area::-webkit-scrollbar-thumb{background:var(--border-color);border-radius:2px}
+
+        .map-card{position:relative;flex-shrink:0;height:7.5vh;min-height:44px;border-radius:var(--radius);overflow:hidden;background-size:cover;background-position:center 30%;border:1px solid var(--border-color);cursor:default;transition:opacity .3s,transform .3s,box-shadow .3s;display:flex;align-items:center;justify-content:space-between;padding:0 1vw 0 1.2vw}
+        .map-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(7,12,26,.88) 0%,rgba(7,12,26,.4) 45%,rgba(7,12,26,.15) 70%,rgba(7,12,26,.05) 100%);z-index:1;pointer-events:none}
+        .map-card>*{position:relative;z-index:2}
+        .map-card.banned{filter:grayscale(1);opacity:.55;border-color:#333}
+        .map-card.banned::before{background:linear-gradient(135deg,rgba(7,12,26,.95),rgba(7,12,26,.7) 60%,rgba(7,12,26,.4))}
+        .map-card.decider{border-color:var(--accent-gold);box-shadow:0 0 20px rgba(255,215,0,.05)}
+        .map-card.clickable{cursor:pointer}
+        .map-card.clickable:hover{transform:scale(1.01);border-color:var(--border-light)}
+        .map-card.clickable.t1-hover:hover{border-color:var(--t1-blue);box-shadow:0 0 20px var(--t1-glow)}
+        .map-card.clickable.t2-hover:hover{border-color:var(--t2-orange);box-shadow:0 0 20px var(--t2-glow)}
+        .map-card.pick-anim{animation:pickPulse .6s ease}
+        @keyframes pickPulse{0%{transform:scale(1)}50%{transform:scale(1.02);border-color:var(--accent-green)}100%{transform:scale(1)}}
+
+        .map-left{display:flex;align-items:center;gap:.8em;flex:1;min-width:0}
+        .map-name{font-family:var(--font-display);font-weight:700;font-size:clamp(.7rem,1.1vw,1.3rem);color:var(--text-primary);text-shadow:0 2px 8px rgba(0,0,0,.6);white-space:nowrap}
+        .map-sub{font-size:clamp(.4rem,.5vw,.6rem);color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+
+        .map-right{display:flex;align-items:center;gap:.4em;background:rgba(7,12,26,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:var(--radius-sm);border:1px solid rgba(255,255,255,.04);padding:.25em .6em;flex-shrink:0;max-width:60%}
+        .tag{font-family:var(--font-display);font-weight:600;font-size:clamp(.42rem,.55vw,.65rem);letter-spacing:.06em;text-transform:uppercase;padding:.12em .5em;border-radius:99px;white-space:nowrap;border:1px solid}
+        .tag.muted{background:rgba(100,100,120,.12);color:var(--text-muted);border-color:rgba(100,100,120,.15)}
+        .tag.t1-bg{background:rgba(59,130,246,.12);color:var(--t1-blue);border-color:rgba(59,130,246,.2)}
+        .tag.t2-bg{background:rgba(245,158,11,.12);color:var(--t2-orange);border-color:rgba(245,158,11,.2)}
+        .tag.gold{background:rgba(255,215,0,.08);color:var(--accent-gold);border-color:rgba(255,215,0,.15)}
+        .tag.green{background:rgba(16,185,129,.1);color:var(--accent-green);border-color:rgba(16,185,129,.15)}
+        .tag.ct{background:rgba(59,130,246,.12);color:var(--t1-blue);border-color:rgba(59,130,246,.2)}
+        .tag.t{background:rgba(245,158,11,.12);color:var(--t2-orange);border-color:rgba(245,158,11,.2)}
+        .tag.small{font-size:clamp(.36rem,.45vw,.55rem);padding:.08em .4em}
+        .tag.action{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.06);color:var(--text-secondary);cursor:pointer;transition:all .2s}
+        .tag.action:hover{background:rgba(255,255,255,.08)}
+        .tag.action.t1-a{background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.2);color:var(--t1-blue)}
+        .tag.action.t1-a:hover{background:rgba(59,130,246,.15)}
+        .tag.action.t2-a{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.2);color:var(--t2-orange)}
+        .tag.action.t2-a:hover{background:rgba(245,158,11,.15)}
+        .tag.action.voted{background:rgba(255,215,0,.1);border-color:rgba(255,215,0,.2);color:var(--accent-gold)}
+
+        .map-votes{display:flex;gap:.15em;margin-left:.3em}
+        .vote-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+        .vote-dot.v1{background:var(--t1-blue)}
+        .vote-dot.v2{background:var(--t2-orange)}
+
+        /* ── Turn panel (for acting team) ── */
+        .turn-panel{flex-shrink:0;width:100%;background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);padding:.6vh 1.2vw;display:flex;align-items:center;justify-content:space-between;gap:.8em;opacity:0;transition:opacity .3s;max-height:0;overflow:hidden}
+        .turn-panel.active{opacity:1;max-height:8vh;padding:.6vh 1.2vw}
+        .turn-panel .info{font-family:var(--font-display);font-size:clamp(.55rem,.7vw,.85rem);color:var(--text-primary);letter-spacing:.08em}
+        .turn-panel .info .hl{font-weight:700}
+        .turn-panel .timer{font-family:var(--font-display);font-weight:700;font-size:clamp(1rem,1.5vw,1.8rem);color:var(--accent-gold);letter-spacing:.05em}
+        .turn-panel .cancel-vote{font-family:var(--font-body);font-size:clamp(.45rem,.55vw,.65rem);color:var(--text-muted);cursor:pointer;background:none;border:none;padding:.2em .5em}
+        .turn-panel .cancel-vote:hover{color:var(--text-secondary)}
+
+        /* ── Dialogs ── */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:100}
+        .modal-overlay.open{display:flex}
+        .modal-box{background:var(--bg-card);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:2.5vh 3vw;max-width:440px;width:90%;box-shadow:var(--shadow-lg);text-align:center;animation:dIn .25s ease}
+        @keyframes dIn{from{opacity:0;transform:scale(.92) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+        .modal-title{font-family:var(--font-display);font-weight:700;font-size:clamp(.9rem,1.3vw,1.5rem);color:var(--text-primary);margin-bottom:.5em;letter-spacing:.05em}
+        .modal-input{width:100%;padding:.5em .8em;background:rgba(0,0,0,.3);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-body);font-size:clamp(.65rem,.8vw,.95rem);outline:none;margin-bottom:.8em}
+        .modal-input:focus{border-color:var(--text-secondary)}
+        .modal-input::placeholder{color:var(--text-muted)}
+        .modal-actions{display:flex;gap:.6em;justify-content:center;flex-wrap:wrap;margin-top:.5em}
+        .modal-btn{font-family:var(--font-display);font-weight:700;font-size:clamp(.55rem,.7vw,.85rem);letter-spacing:.1em;text-transform:uppercase;padding:.4em 1.2em;border-radius:var(--radius-sm);cursor:pointer;transition:all var(--transition);border:2px solid;background:rgba(0,0,0,.3);min-width:80px}
+        .modal-btn.gold{color:var(--accent-gold);border-color:rgba(255,215,0,.3)}
+        .modal-btn.gold:hover{background:rgba(255,215,0,.12);border-color:var(--accent-gold)}
+        .modal-btn.blue{color:var(--t1-blue);border-color:rgba(59,130,246,.3)}
+        .modal-btn.blue:hover{background:rgba(59,130,246,.1);border-color:var(--t1-blue)}
+        .modal-btn.orange{color:var(--t2-orange);border-color:rgba(245,158,11,.3)}
+        .modal-btn.orange:hover{background:rgba(245,158,11,.1);border-color:var(--t2-orange)}
+        .modal-btn.gray{color:var(--text-muted);border-color:rgba(255,255,255,.08)}
+        .modal-btn.gray:hover{background:rgba(255,255,255,.04);border-color:var(--text-muted)}
+        .modal-cancel{font-size:clamp(.5rem,.6vw,.7rem);color:var(--text-muted);background:none;border:none;cursor:pointer;padding:.3em .8em;margin-top:.5em}
+        .modal-cancel:hover{color:var(--text-secondary)}
+        .modal-hint{font-size:clamp(.45rem,.55vw,.65rem);color:var(--text-muted);margin-bottom:.5em}
+
+        /* ── Responsive ── */
+        @media(max-width:768px){
+            .screen{padding:1.5vh 3vw}
+            .team-card{padding:.6vh 2vw}
+            .map-card{height:6.5vh}
+        }
+    </style>
+</head>
+<body>
+    <div class="screen">
+        <div class="content">
+
+            <!-- Top bar -->
+            <div class="top-bar">
+                <button class="admin-btn" id="adminBtn">⚙ Admin</button>
+                <div class="bp-title">BAN & <span class="hl">PICK</span></div>
+                <div class="bo-badge" id="boBadge">BO3</div>
+            </div>
+
+            <!-- Teams -->
+            <div class="team-row" id="teamRow">
+                <div class="team-card t1" id="team1Card">
+                    <div class="team-name" id="team1Name">Team 1</div>
+                    <div class="team-players" id="team1Players"></div>
+                    <button class="team-action-btn t1" id="team1Enter">Enter Team</button>
+                </div>
+                <div class="vs-text">VS</div>
+                <div class="team-card t2" id="team2Card">
+                    <div class="team-name" id="team2Name">Team 2</div>
+                    <div class="team-players" id="team2Players"></div>
+                    <button class="team-action-btn t2" id="team2Enter">Enter Team</button>
+                </div>
+            </div>
+
+            <!-- Status bar -->
+            <div class="status-bar">
+                <button class="spectate-btn" id="spectateBtn">👁 Spectate</button>
+                <div class="turn-info" id="turnInfo">Waiting for players...</div>
+            </div>
+
+            <!-- Turn action panel -->
+            <div class="turn-panel" id="turnPanel">
+                <div class="info" id="turnPanelInfo"><span class="hl" id="turnPanelText">Your turn</span></div>
+                <div class="timer" id="voteTimer"></div>
+                <button class="cancel-vote" id="cancelVoteBtn" style="display:none">Cancel Vote</button>
+            </div>
+
+            <!-- Maps -->
+            <div class="maps-area" id="mapsArea"></div>
+
+        </div>
+    </div>
+
+    <!-- ─── Modal ─── -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal-box">
+            <div class="modal-title" id="modalTitle">Enter</div>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        // ── Socket.IO ──────────────────────────────────────────────────
+        const socket = io();
+
+        // ── State ──────────────────────────────────────────────────────
+        let state = null;
+        let myTeam = 0;       // 0 = spectator, 1/2 = team
+        let myRole = '';      // 'captain', 'player', 'spectator'
+        let mySid = '';
+        let myName = '';
+        let adminAuthed = false;
+        let isObserver = false;
+
+        // ── DOM ────────────────────────────────────────────────────────
+        const $ = id => document.getElementById(id);
+        const modal = $('modal');
+        const modalTitle = $('modalTitle');
+        const modalBody = $('modalBody');
+
+        function openModal(title, html) {
+            modalTitle.textContent = title;
+            modalBody.innerHTML = html;
+            modal.classList.add('open');
+        }
+        function closeModal() {
+            modal.classList.remove('open');
+        }
+        modal.addEventListener('click', e => {
+            if (e.target === modal) closeModal();
+        });
+
+        // ── State update ───────────────────────────────────────────────
+        socket.on('state_update', data => {
+            state = data;
+            render();
+        });
+
+        socket.on('error', data => {
+            if (data && data.message) alert(data.message);
+        });
+
+        socket.on('admin_login_result', data => {
+            if (data.success) {
+                adminAuthed = true;
+                closeModal();
+                showAdminPanel();
+            } else {
+                alert('Wrong password');
+            }
+        });
+
+        socket.on('admin_update_result', data => {
+            if (data.success) closeModal();
+        });
+
+        socket.on('team_entry_result', data => {
+            if (data.success) {
+                myTeam = data.team;
+                myRole = data.role;
+                myName = data.name || '';
+                closeModal();
+            }
+        });
+
+        socket.on('spectate_result', () => {
+            isObserver = true;
+            closeModal();
+        });
+
+        // ── Render ─────────────────────────────────────────────────────
+        function render() {
+            if (!state) return;
+
+            // Team names
+            $('team1Name').textContent = state.team1_name;
+            $('team2Name').textContent = state.team2_name;
+            $('boBadge').textContent = `BO${state.bo}`;
+
+            // Team players
+            const t1p = state.team1_players || [];
+            const t2p = state.team2_players || [];
+            $('team1Players').innerHTML = t1p.map(p =>
+                `<span>${p.name}${myTeam === 1 && myName === p.name ? ' (You)' : ''}</span>`
+            ).join('');
+            $('team2Players').innerHTML = t2p.map(p =>
+                `<span>${p.name}${myTeam === 2 && myName === p.name ? ' (You)' : ''}</span>`
+            ).join('');
+
+            // Team enter buttons
+            const t1btn = $('team1Enter');
+            const t2btn = $('team2Enter');
+            t1btn.style.display = (myTeam === 1 || isObserver) ? 'none' : 'inline-block';
+            t2btn.style.display = (myTeam === 2 || isObserver) ? 'none' : 'inline-block';
+
+            if (myTeam === 1) {
+                t1btn.style.display = 'inline-block';
+                t1btn.textContent = state.entry_mode === 'captain' ? '✓ Captain' : '✓ You';
+                t1btn.disabled = true;
+            }
+            if (myTeam === 2) {
+                t2btn.style.display = 'inline-block';
+                t2btn.textContent = state.entry_mode === 'captain' ? '✓ Captain' : '✓ You';
+                t2btn.disabled = true;
+            }
+
+            // Spectate button
+            const specBtn = $('spectateBtn');
+            if (isObserver) {
+                specBtn.textContent = '👁 Observing';
+                specBtn.classList.add('active');
+            } else if (myTeam === 0) {
+                specBtn.textContent = '👁 Spectate';
+                specBtn.classList.remove('active');
+            } else {
+                specBtn.style.display = 'none';
+            }
+
+            // Turn info
+            const turnInfo = $('turnInfo');
+            if (state.phase === 'idle') {
+                turnInfo.textContent = 'Waiting for players...';
+            } else if (state.phase === 'bp' || state.phase === 'side_pick') {
+                const tn = state.current_team === 1 ? state.team1_name : state.team2_name;
+                const tc = state.current_team === 1 ? 't1c' : 't2c';
+                const action = state.current_action === 'ban' ? 'BAN' : state.current_action === 'pick' ? 'PICK' : 'CHOOSE SIDE';
+                turnInfo.innerHTML = `<span class="${tc}">${tn}</span> to <span class="acting">${action}</span>${state.remaining_in_step > 1 ? ` (${state.remaining_in_step} left)` : ''}`;
+            } else if (state.phase === 'complete') {
+                turnInfo.textContent = '✅ BP Complete';
+            }
+
+            // Turn panel
+            const panel = $('turnPanel');
+            const isMyTurn = (myTeam === state.current_team && state.phase === 'bp') ||
+                             (myTeam === state.current_team && state.phase === 'side_pick');
+            const canAct = (myTeam > 0 && (state.phase === 'bp' || state.phase === 'side_pick'));
+
+            if (canAct) {
+                if (state.vote_active && state.entry_mode === 'team') {
+                    panel.classList.add('active');
+                    const isMySidePick = state.phase === 'side_pick';
+                    const actionLabel = state.current_action === 'ban' ? 'BAN' : state.current_action === 'pick' ? 'PICK' : 'SIDE';
+                    $('turnPanelText').innerHTML = `VOTE: ${actionLabel} <span style="color:var(--accent-gold)">${state.vote_remaining}s</span>`;
+                    $('voteTimer').textContent = `${state.vote_remaining}s`;
+                    $('cancelVoteBtn').style.display = 'none';
+                } else if (isMyTurn && state.entry_mode === 'captain') {
+                    panel.classList.add('active');
+                    const actionLabel = state.current_action === 'ban' ? 'BAN' : state.current_action === 'pick' ? 'PICK' : 'CHOOSE SIDE';
+                    $('turnPanelText').innerHTML = `Your turn to <span style="color:var(--accent-green)">${actionLabel}</span>`;
+                    $('voteTimer').textContent = '';
+                    $('cancelVoteBtn').style.display = 'none';
+                } else if (myTeam > 0 && state.entry_mode === 'team' && !state.vote_active) {
+                    panel.classList.add('active');
+                    $('turnPanelText').textContent = 'Waiting for vote to start...';
+                    $('voteTimer').textContent = '';
+                    $('cancelVoteBtn').style.display = 'none';
+                } else {
+                    panel.classList.remove('active');
+                }
+            } else {
+                panel.classList.remove('active');
+            }
+
+            // Maps
+            renderMaps();
+        }
+
+        // ── Map rendering ──────────────────────────────────────────────
+        function renderMaps() {
+            const area = $('mapsArea');
+            if (!state) return;
+
+            // Which maps to show: all from map_pool, in pool order
+            const pool = state.map_pool || [];
+
+            area.innerHTML = pool.map(mapId => {
+                const mapName = mapId.replace('de_', '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                const banned = state.banned.find(b => b.map_id === mapId);
+                const picked = state.picked.find(p => p.map_id === mapId);
+                const available = state.available.includes(mapId);
+                const isDecider = state.phase === 'complete' && state.available.length === 1 && state.available[0] === mapId && !banned && !picked;
+
+                let classes = 'map-card';
+                if (banned) classes += ' banned';
+                if (isDecider) classes += ' decider';
+
+                // Is this map clickable?
+                const isClickable = canInteractWith(mapId);
+                if (isClickable) {
+                    classes += ' clickable';
+                    classes += state.current_team === 1 ? ' t1-hover' : ' t2-hover';
+                }
+
+                // Right-side tags
+                let tags = '';
+                if (banned) {
+                    const teamName = banned.by === 1 ? state.team1_name : state.team2_name;
+                    const teamCls = banned.by === 1 ? 't1-bg' : 't2-bg';
+                    tags = `<span class="tag ${teamCls}">${teamName} BANNED</span>`;
+                } else if (picked) {
+                    const pickerName = picked.by === 1 ? state.team1_name : state.team2_name;
+                    const pickerCls = picked.by === 1 ? 't1-bg' : 't2-bg';
+                    tags = `<span class="tag ${pickerCls}">${pickerName} PICKED</span>`;
+                    if (picked.ct_team) {
+                        const ctName = picked.ct_team === 1 ? state.team1_name : state.team2_name;
+                        const ctCls = picked.ct_team === 1 ? 'ct' : 'ct';  // CT always blue on the map
+                        const tName = picked.ct_team === 1 ? state.team2_name : state.team1_name;
+                        tags += `<span class="tag ct">${ctName} CT</span>`;
+                        tags += `<span class="tag t">${tName} T</span>`;
+                    }
+                } else if (isDecider) {
+                    tags = `<span class="tag gold">DECIDER</span>`;
+                } else if (isClickable) {
+                    const action = state.current_action === 'ban' ? 'BAN' : 'PICK';
+                    const teamCls = state.current_team === 1 ? 't1-a' : 't2-a';
+                    tags = `<span class="tag action ${teamCls}" data-map="${mapId}">${action}</span>`;
+                } else {
+                    tags = `<span class="tag muted">Available</span>`;
+                }
+
+                // Vote indicators
+                const voteCounts = countVotesFor(mapId);
+                if (voteCounts > 0) {
+                    const dots = Array(voteCounts).fill('<span class="vote-dot v1"></span>').join('');
+                    tags += `<span class="map-votes">${dots}</span>`;
+                }
+
+                return `
+                    <div class="${classes}" data-map="${mapId}" style="background-image:url(res/${mapId}.png)">
+                        <div class="map-left">
+                            <div>
+                                <div class="map-name">${mapName}</div>
+                                <div class="map-sub">${mapId}</div>
+                            </div>
+                        </div>
+                        <div class="map-right">${tags}</div>
+                    </div>
+                `;
+            }).join('');
+
+            // Attach click handlers for action tags
+            area.querySelectorAll('.tag.action').forEach(el => {
+                el.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const mapId = el.dataset.map;
+                    if (state.phase === 'side_pick') return;
+                    socket.emit('action', { map_id: mapId });
+                });
+            });
+
+            // Attach click handlers for map cards (side pick)
+            area.querySelectorAll('.map-card.clickable').forEach(el => {
+                el.addEventListener('click', () => {
+                    if (state.phase === 'side_pick') return;
+                    const mapId = el.dataset.map;
+                    if (state.current_action === 'ban' || state.current_action === 'pick') {
+                        socket.emit('action', { map_id: mapId });
+                    }
+                });
+            });
+        }
+
+        function canInteractWith(mapId) {
+            if (!state) return false;
+            if (myTeam <= 0) return false;
+            if (state.phase !== 'bp') return false;
+            if (myTeam !== state.current_team) return false;
+            if (!state.available.includes(mapId)) return false;
+            return true;
+        }
+
+        function countVotesFor(mapId) {
+            if (!state || !state.votes) return 0;
+            return Object.values(state.votes).filter(v => v.map_id === mapId).length;
+        }
+
+        // ── Admin panel ────────────────────────────────────────────────
+        $('adminBtn').addEventListener('click', () => {
+            if (adminAuthed) {
+                showAdminPanel();
+            } else {
+                openModal('Admin Login', `
+                    <input class="modal-input" type="password" id="adminPwd" placeholder="Password" />
+                    <div class="modal-actions">
+                        <button class="modal-btn gold" id="adminLoginBtn">Login</button>
+                        <button class="modal-btn gray" onclick="closeModal()">Cancel</button>
+                    </div>
+                `);
+                setTimeout(() => $('adminPwd')?.focus(), 100);
+                $('adminLoginBtn').addEventListener('click', () => {
+                    const pwd = $('adminPwd')?.value || '';
+                    socket.emit('admin_login', { password: pwd });
+                });
+                $('adminPwd')?.addEventListener('keydown', e => {
+                    if (e.key === 'Enter') $('adminLoginBtn')?.click();
+                });
+            }
+        });
+
+        function showAdminPanel() {
+            if (!state) return;
+            openModal('Admin Panel', `
+                <div style="text-align:left;font-size:clamp(.5rem,.65vw,.75rem)">
+                    <label style="color:var(--text-muted)">Map Pool (comma-separated IDs)</label>
+                    <input class="modal-input" id="admMapPool" value="${(state.map_pool || []).join(', ')}" />
+                    <label style="color:var(--text-muted)">BO</label>
+                    <input class="modal-input" id="admBo" value="${state.bo}" placeholder="1 / 3 / 5" />
+                    <label style="color:var(--text-muted)">Entry Mode</label>
+                    <input class="modal-input" id="admEntryMode" value="${state.entry_mode}" placeholder="captain / team" />
+                    <label style="color:var(--text-muted)">Team 1 Name</label>
+                    <input class="modal-input" id="admT1Name" value="${state.team1_name}" />
+                    <label style="color:var(--text-muted)">Team 2 Name</label>
+                    <input class="modal-input" id="admT2Name" value="${state.team2_name}" />
+                    <label style="color:var(--text-muted)">New Admin Password (leave blank to keep)</label>
+                    <input class="modal-input" type="password" id="admAdminPwd" placeholder="New admin password" />
+                    <label style="color:var(--text-muted)">New Team 1 Password (leave blank to keep)</label>
+                    <input class="modal-input" type="password" id="admT1Pwd" placeholder="New team 1 password" />
+                    <label style="color:var(--text-muted)">New Team 2 Password (leave blank to keep)</label>
+                    <input class="modal-input" type="password" id="admT2Pwd" placeholder="New team 2 password" />
+                </div>
+                <div class="modal-actions" style="margin-top:.8em">
+                    <button class="modal-btn gold" id="admSaveBtn">Save</button>
+                    <button class="modal-btn blue" id="admStartBtn">Start BP</button>
+                    <button class="modal-btn orange" id="admResetBtn">Reset</button>
+                    <button class="modal-btn gray" onclick="closeModal()">Close</button>
+                </div>
+            `);
+
+            $('admSaveBtn').addEventListener('click', () => {
+                const updates = {};
+                const pool = ($('admMapPool')?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+                if (pool.length) updates.map_pool = pool;
+                const bo = parseInt($('admBo')?.value);
+                if ([1,3,5].includes(bo)) updates.bo = bo;
+                const mode = ($('admEntryMode')?.value || '').toLowerCase();
+                if (['captain','team'].includes(mode)) updates.entry_mode = mode;
+                const t1 = $('admT1Name')?.value?.trim();
+                if (t1) updates.team1_name = t1;
+                const t2 = $('admT2Name')?.value?.trim();
+                if (t2) updates.team2_name = t2;
+                const ap = $('admAdminPwd')?.value?.trim();
+                if (ap) updates.admin_password = ap;
+                const t1p = $('admT1Pwd')?.value?.trim();
+                if (t1p) updates.team1_password = t1p;
+                const t2p = $('admT2Pwd')?.value?.trim();
+                if (t2p) updates.team2_password = t2p;
+
+                // Need to re-authenticate - use stored password? Actually admin is already authed in session
+                // We'll store the admin password in the session
+                socket.emit('admin_update', { password: '', updates });
+                // Actually we need to send the admin password. Let's prompt.
+                openModal('Confirm Admin Password', `
+                    <input class="modal-input" type="password" id="admConfirmPwd" placeholder="Admin password" />
+                    <div class="modal-actions">
+                        <button class="modal-btn gold" id="admConfirmBtn">Confirm</button>
+                        <button class="modal-btn gray" onclick="closeModal()">Cancel</button>
+                    </div>
+                `);
+                $('admConfirmBtn').addEventListener('click', () => {
+                    const pwd = $('admConfirmPwd')?.value || '';
+                    socket.emit('admin_update', { password: pwd, updates });
+                    closeModal();
+                });
+            });
+
+            $('admStartBtn').addEventListener('click', () => {
+                openModal('Start BP', `
+                    <div style="color:var(--text-secondary);font-size:clamp(.55rem,.7vw,.8rem);margin-bottom:.5em">Enter admin password to start BP</div>
+                    <input class="modal-input" type="password" id="startPwd" placeholder="Admin password" />
+                    <div class="modal-actions">
+                        <button class="modal-btn gold" id="startConfirmBtn">Start</button>
+                        <button class="modal-btn gray" onclick="closeModal()">Cancel</button>
+                    </div>
+                `);
+                $('startConfirmBtn').addEventListener('click', () => {
+                    const pwd = $('startPwd')?.value || '';
+                    socket.emit('start_bp', { password: pwd });
+                    closeModal();
+                });
+            });
+
+            $('admResetBtn').addEventListener('click', () => {
+                openModal('Reset State', `
+                    <div style="color:var(--text-secondary);font-size:clamp(.55rem,.7vw,.8rem);margin-bottom:.5em">Enter admin password to reset</div>
+                    <input class="modal-input" type="password" id="resetPwd" placeholder="Admin password" />
+                    <div class="modal-actions">
+                        <button class="modal-btn gold" id="resetConfirmBtn">Reset</button>
+                        <button class="modal-btn gray" onclick="closeModal()">Cancel</button>
+                    </div>
+                `);
+                $('resetConfirmBtn').addEventListener('click', () => {
+                    const pwd = $('resetPwd')?.value || '';
+                    socket.emit('reset_state', { password: pwd });
+                    closeModal();
+                });
+            });
+        }
+
+        // ── Team entry ─────────────────────────────────────────────────
+        $('team1Enter').addEventListener('click', () => enterTeam(1));
+        $('team2Enter').addEventListener('click', () => enterTeam(2));
+
+        function enterTeam(team) {
+            const label = team === 1 ? state?.team1_name || 'Team 1' : state?.team2_name || 'Team 2';
+            const isTeamMode = state?.entry_mode === 'team';
+
+            if (isTeamMode) {
+                openModal(`Enter ${label}`, `
+                    <div class="modal-hint">Enter your player name and team password</div>
+                    <input class="modal-input" id="enterName" placeholder="Your name" />
+                    <input class="modal-input" type="password" id="enterPwd" placeholder="Team password" />
+                    <div class="modal-actions">
+                        <button class="modal-btn ${team === 1 ? 'blue' : 'orange'}" id="enterConfirm">Enter</button>
+                        <button class="modal-btn gray" onclick="closeModal()">Cancel</button>
+                    </div>
+                `);
+                setTimeout(() => $('enterName')?.focus(), 100);
+                $('enterConfirm').addEventListener('click', () => {
+                    const name = $('enterName')?.value?.trim() || '';
+                    const pwd = $('enterPwd')?.value || '';
+                    if (!name) { alert('Name is required'); return; }
+                    socket.emit('enter_team', { team, password: pwd, name });
+                });
+            } else {
+                openModal(`Enter ${label} as Captain`, `
+                    <div class="modal-hint">Enter the team password to join as captain</div>
+                    <input class="modal-input" type="password" id="enterPwdC" placeholder="Team password" />
+                    <div class="modal-actions">
+                        <button class="modal-btn ${team === 1 ? 'blue' : 'orange'}" id="enterConfirmC">Enter</button>
+                        <button class="modal-btn gray" onclick="closeModal()">Cancel</button>
+                    </div>
+                `);
+                setTimeout(() => $('enterPwdC')?.focus(), 100);
+                $('enterConfirmC').addEventListener('click', () => {
+                    const pwd = $('enterPwdC')?.value || '';
+                    socket.emit('enter_team', { team, password: pwd, name: `Captain ${label}` });
+                });
+            }
+        }
+
+        // ── Spectate ───────────────────────────────────────────────────
+        $('spectateBtn').addEventListener('click', () => {
+            if (isObserver) return;
+            socket.emit('spectate');
+        });
+
+        // ── Init ───────────────────────────────────────────────────────
+        console.log('Realtime BP — CS2 HUD');
+        console.log('Connected to server:', socket.connected);
+    </script>
+</body>
+</html>
