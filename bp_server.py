@@ -11,7 +11,7 @@ import random
 import threading
 import time
 from collections import Counter
-from flask import Flask, request, send_from_directory
+from flask import Flask, send_from_directory
 from flask_socketio import SocketIO, emit
 
 # ── Config ────────────────────────────────────────────────────────────────
@@ -46,11 +46,12 @@ def ensure_config():
         print("✦ Created default config with passwords: admin / team1 / team2")
         print("  Change them with: python bp_admin.py")
         return
+    # Check version
     try:
         with open(CONFIG_PATH) as f:
             existing = json.load(f)
-        # Check version
         if existing.get('_version') != CONFIG_VERSION:
+            # Merge existing settings into new defaults
             defaults = make_default_config()
             for key in ('admin', 'teams', 'map_pool', 'bo', 'entry_mode'):
                 if key in existing:
@@ -58,31 +59,9 @@ def ensure_config():
             defaults['_version'] = CONFIG_VERSION
             save_config(defaults)
             print("✦ Config upgraded to v" + str(CONFIG_VERSION))
-            return
-        # Validate: check that admin hash is consistent with its salt
-        s = existing.get('admin', {}).get('salt', '')
-        h = existing.get('admin', {}).get('password_hash', '')
-        if s and h:
-            # Test if "admin" + salt produces the stored hash
-            test = hash_password('admin', s)
-            if test != h:
-                # Hash doesn't match — config might be hand-edited with wrong hash
-                print("⚠ Admin password hash is invalid. Regenerating config...")
-                print("  Default passwords restored. Use python bp_admin.py to change.")
-                defaults = make_default_config()
-                # Preserve team names and map settings
-                for key in ('map_pool', 'bo', 'entry_mode'):
-                    if key in existing:
-                        defaults[key] = existing[key]
-                for team_key in ('team1', 'team2'):
-                    if team_key in existing.get('teams', {}):
-                        if 'name' in existing['teams'][team_key]:
-                            defaults['teams'][team_key]['name'] = existing['teams'][team_key]['name']
-                save_config(defaults)
-    except Exception as e:
-        print("⚠ Config error: " + str(e))
+    except Exception:
         save_config(make_default_config())
-        print("✦ Config recreated with default passwords: admin / team1 / team2")
+        print("✦ Config recreated (invalid file)")
 
 def load_config():
     ensure_config()
@@ -603,11 +582,9 @@ def index():
 
 # ── Main ─────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    import sys
-    if '--reset-config' in sys.argv:
-        save_config(make_default_config())
-        print("✦ Config reset to defaults. Passwords: admin / team1 / team2")
-        sys.exit(0)
+    import socketio as sio_module
+    # Need request context for sid
+    from flask import request
     print("═══ CS2 Real-time BP Server ═══")
     print(f"Config: {CONFIG_PATH}")
     print(f"BO{config['bo']} | Mode: {config['entry_mode']}")
