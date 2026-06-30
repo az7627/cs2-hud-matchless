@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Match Results — CS2 HUD</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #070c1a;
+            --bg-secondary: #0d1628;
+            --bg-card: #111d35;
+            --bg-card-alt: #152240;
+            --ct-blue: #3b82f6;
+            --ct-blue-dim: #1d4ed8;
+            --ct-glow: rgba(59, 130, 246, 0.12);
+            --t-orange: #f59e0b;
+            --t-orange-dim: #d97706;
+            --t-glow: rgba(245, 158, 11, 0.12);
+            --accent-gold: #ffd700;
+            --accent-green: #10b981;
+            --text-primary: #f0f4ff;
+            --text-secondary: #8899c0;
+            --text-muted: #5a6e96;
+            --border-color: #1e3055;
+            --border-light: #2a4078;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.5);
+            --shadow-lg: 0 8px 48px rgba(0, 0, 0, 0.6);
+            --radius-sm: 6px;
+            --radius: 12px;
+            --radius-lg: 20px;
+            --font-body: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            --font-display: 'Rajdhani', 'Inter', sans-serif;
+            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%; height: 100%; overflow: hidden;
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+        }
+        .screen {
+            position: relative;
+            width: 100vw; height: 100vh;
+            aspect-ratio: 16 / 9;
+            max-width: 100%; max-height: 100%;
+            margin: 0 auto;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background:
+                radial-gradient(ellipse 60% 50% at 50% 30%, rgba(11, 22, 56, 0.4) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 40% at 50% 60%, rgba(255, 215, 0, 0.03) 0%, transparent 70%),
+                radial-gradient(ellipse 40% 30% at 20% 80%, rgba(59, 130, 246, 0.04) 0%, transparent 70%),
+                radial-gradient(ellipse 40% 30% at 80% 80%, rgba(245, 158, 11, 0.04) 0%, transparent 70%),
+                linear-gradient(180deg, #070c1a 0%, #0b1428 50%, #070c1a 100%);
+            padding: 2.5vh 4vw;
+        }
+        .screen::before {
+            content: '';
+            position: absolute; inset: 0;
+            background-image:
+                linear-gradient(rgba(30, 48, 85, 0.10) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(30, 48, 85, 0.10) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none; z-index: 0;
+        }
+        .screen > * { position: relative; z-index: 1; }
+
+        .content {
+            width: 100%; max-width: 1400px; max-height: 100%;
+            display: flex; flex-direction: column;
+            align-items: center; gap: 2.5vh;
+        }
+
+        /* ===== Header ===== */
+        .header-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(1.3rem, 2vw, 2.4rem);
+            letter-spacing: 0.5em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        /* ===== Trophy / Winner Section ===== */
+        .winner-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5em;
+            margin: 0.5vh 0;
+        }
+        .trophy {
+            font-size: clamp(2.5rem, 4vw, 4.5rem);
+            line-height: 1;
+            color: var(--accent-gold);
+            text-shadow: 0 0 40px rgba(255, 215, 0, 0.2);
+        }
+        .winner-label {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: clamp(0.65rem, 0.8vw, 0.9rem);
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: var(--accent-gold);
+        }
+        .winner-name {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(2.5rem, 4.5vw, 5rem);
+            text-align: center;
+            color: var(--text-primary);
+            text-shadow: 0 0 60px rgba(255, 255, 255, 0.05);
+        }
+        .winner-name-input {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(2.5rem, 4.5vw, 5rem);
+            text-align: center;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--accent-gold);
+            color: var(--text-primary);
+            padding: 0.1em 0.3em;
+            min-width: 200px;
+            outline: none;
+            text-shadow: 0 0 60px rgba(255, 255, 255, 0.05);
+        }
+        .winner-name-input:focus { border-bottom-color: var(--accent-gold); }
+        .winner-name-input::placeholder { color: var(--text-muted); }
+        .winner-name-display { text-align: center; }
+
+        .final-score {
+            display: flex;
+            align-items: center;
+            gap: 0.8em;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(1.8rem, 3.2vw, 3.8rem);
+            margin-top: 0.2em;
+        }
+        .final-score .score-ct { color: var(--ct-blue); }
+        .final-score .score-t  { color: var(--t-orange); }
+        .final-score .dash { color: var(--text-muted); }
+
+        .final-score-input {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(1.5rem, 2.5vw, 3rem);
+            text-align: center;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.1em 0.2em;
+            width: 2em;
+            outline: none;
+        }
+        .final-score-input:focus { border-bottom-color: var(--text-secondary); }
+
+        /* ===== Team badges row ===== */
+        .teams-row {
+            display: flex;
+            align-items: center;
+            gap: 1.5vw;
+            justify-content: center;
+        }
+        .team-badge {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.2em;
+        }
+        .team-badge .side {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: clamp(0.65rem, 0.8vw, 1rem);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            padding: 0.2em 0.8em;
+            border-radius: 999px;
+            line-height: 1.5;
+        }
+        .team-badge.ct .side { color: var(--ct-blue); background: rgba(59,130,246,0.12); }
+        .team-badge.t .side  { color: var(--t-orange); background: rgba(245,158,11,0.12); }
+        .team-badge .name {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(1rem, 1.5vw, 1.8rem);
+        }
+        .team-badge .name-input {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: clamp(1rem, 1.5vw, 1.8rem);
+            text-align: center;
+            background: transparent;
+            border: none;
+            border-bottom: 1.5px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.1em 0.3em;
+            min-width: 80px;
+            outline: none;
+        }
+        .team-badge .name-input:focus { border-bottom-color: var(--text-secondary); }
+        .team-badge.ct .name-input:focus { border-bottom-color: var(--ct-blue); }
+        .team-badge.t .name-input:focus  { border-bottom-color: var(--t-orange); }
+        .team-badge .name-input::placeholder { color: var(--text-muted); }
+        .team-badge .name-display { text-align: center; }
+
+        /* ===== Series ===== */
+        .series-badge {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: clamp(0.55rem, 0.65vw, 0.75rem);
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            padding: 0.2em 1em;
+        }
+        .series-input {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: clamp(0.55rem, 0.65vw, 0.75rem);
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            text-align: center;
+            background: transparent;
+            border: none;
+            border-bottom: 1.5px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.15em 0.4em;
+            min-width: 60px;
+            outline: none;
+        }
+        .series-input:focus { border-bottom-color: var(--text-secondary); }
+        .series-input::placeholder { color: var(--text-muted); }
+        .series-display { color: var(--text-muted); }
+
+        /* ===== Map Breakdown ===== */
+        .map-breakdown {
+            width: 100%;
+            max-width: 700px;
+        }
+        .breakdown-title {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: clamp(0.75rem, 0.95vw, 1.1rem);
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 0.5em;
+        }
+
+        .breakdown-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .breakdown-table th {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: clamp(0.6rem, 0.75vw, 0.9rem);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            padding: 0.4em 0.6em;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .breakdown-table th:nth-child(2),
+        .breakdown-table th:nth-child(3),
+        .breakdown-table th:nth-child(4) { text-align: center; }
+        .breakdown-table th:nth-child(5) { text-align: center; }
+
+        .bd-row {
+            border-bottom: 1px solid rgba(30, 48, 85, 0.3);
+        }
+        .bd-row td {
+            padding: 0.5em 0.6em;
+            font-size: clamp(0.7rem, 0.85vw, 1rem);
+            vertical-align: middle;
+        }
+        .bd-row td:nth-child(2),
+        .bd-row td:nth-child(3),
+        .bd-row td:nth-child(4) { text-align: center; }
+        .bd-row td:nth-child(5) { text-align: center; }
+
+        .bd-row .map-num {
+            color: var(--text-muted);
+            font-family: var(--font-display);
+            font-weight: 600;
+        }
+        .bd-row .map-name-text {
+            font-weight: 600;
+        }
+        .bd-row .score-val.ct { color: var(--ct-blue); font-weight: 700; }
+        .bd-row .score-val.t  { color: var(--t-orange); font-weight: 700; }
+        .bd-row .win-icon {
+            font-size: 1.1em;
+        }
+        .bd-row .win-icon.win-ct { color: var(--ct-blue); }
+        .bd-row .win-icon.win-t  { color: var(--t-orange); }
+
+        .bd-row .map-input {
+            background: transparent;
+            border: none;
+            border-bottom: 1.5px solid var(--border-color);
+            color: var(--text-primary);
+            font-size: inherit;
+            font-family: inherit;
+            padding: 0.15em 0.2em;
+            width: 100%;
+            min-width: 40px;
+            outline: none;
+        }
+        .bd-row .map-input:focus { border-bottom-color: var(--text-secondary); }
+        .bd-row .map-input::placeholder { color: var(--text-muted); }
+
+        .bd-row .score-bd-input {
+            background: transparent;
+            border: none;
+            border-bottom: 1.5px solid var(--border-color);
+            color: var(--text-primary);
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: inherit;
+            text-align: center;
+            padding: 0.15em 0.1em;
+            width: 2.2em;
+            outline: none;
+        }
+        .bd-row .score-bd-input:focus { border-bottom-color: var(--text-secondary); }
+        .bd-row .score-sep {
+            color: var(--text-muted);
+            padding: 0 0.1em;
+        }
+
+        /* ===== Confirm ===== */
+        .confirm-btn {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: clamp(0.6rem, 0.75vw, 0.85rem);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            padding: 0.5em 2.2em;
+            border: 2px solid var(--accent-gold);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: background var(--transition), color var(--transition), box-shadow var(--transition);
+            background: transparent;
+            color: var(--accent-gold);
+            margin-top: 0.5vh;
+        }
+        .confirm-btn:hover {
+            background: var(--accent-gold);
+            color: #000;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.15);
+        }
+
+        .hidden  { display: none !important; }
+        .fade-in { animation: fadeIn 0.5s ease forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .screen { padding: 1.5vh 3vw; }
+            .winner-name { font-size: clamp(1.5rem, 5vw, 2.5rem); }
+            .teams-row { gap: 1vw; }
+        }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
+    </style>
+</head>
+<body>
+    <div class="screen">
+        <div class="content">
+
+            <!-- Header -->
+            <div class="header-title">═══ MATCH OVER ═══</div>
+
+            <!-- Series -->
+            <div class="series-badge">
+                <input type="text" id="series-input" class="series-input" placeholder="Series" value="BEST OF 3" data-display="series-display" />
+                <span id="series-display" class="series-display hidden"></span>
+            </div>
+
+            <!-- Winner -->
+            <div class="winner-section">
+                <div class="trophy">🏆</div>
+                <div class="winner-label">Champion</div>
+                <input type="text" id="winner-input" class="winner-name-input" placeholder="Winner" value="Team Liquid" data-display="winner-display" />
+                <span id="winner-display" class="winner-name winner-name-display hidden"></span>
+                <div class="final-score">
+                    <input type="number" id="final-ct-input" class="final-score-input" min="0" max="5" value="2" data-display="final-ct-display" style="color:var(--ct-blue);" />
+                    <span id="final-ct-display" class="score-ct hidden" style="font-size:clamp(1.2rem,2vw,2.2rem);"></span>
+                    <span class="dash">—</span>
+                    <input type="number" id="final-t-input" class="final-score-input" min="0" max="5" value="1" data-display="final-t-display" style="color:var(--t-orange);" />
+                    <span id="final-t-display" class="score-t hidden" style="font-size:clamp(1.2rem,2vw,2.2rem);"></span>
+                </div>
+            </div>
+
+            <!-- Team Badges -->
+            <div class="teams-row">
+                <div class="team-badge ct">
+                    <span class="side" style="color:var(--ct-blue);">TEAM A</span>
+                    <input type="text" id="ct-name-input" class="name-input" placeholder="Team A" value="Team Liquid" data-display="ct-name-display" />
+                    <span id="ct-name-display" class="name name-display hidden"></span>
+                </div>
+                <div style="color:var(--text-muted); font-size:clamp(0.85rem,1vw,1.2rem);font-weight:600;">VS</div>
+                <div class="team-badge t">
+                    <span class="side" style="color:var(--t-orange);">TEAM B</span>
+                    <input type="text" id="t-name-input" class="name-input" placeholder="Team B" value="NAVI" data-display="t-name-display" />
+                    <span id="t-name-display" class="name name-display hidden"></span>
+                </div>
+            </div>
+
+            <!-- Map Breakdown -->
+            <div class="map-breakdown">
+                <div class="breakdown-title">═══ Map Breakdown ═══</div>
+                <table class="breakdown-table">
+                    <thead>
+                        <tr>
+                            <th style="width:2.5em;">#</th>
+                            <th>Map</th>
+                            <th id="result-header-a" style="width:2.5em;color:var(--ct-blue);">Team A</th>
+                            <th id="result-header-b" style="width:2.5em;color:var(--t-orange);">Team B</th>
+                            <th style="width:2.5em;">Result</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bd-tbody">
+                        <!-- generated by JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Confirm -->
+            <button id="confirm-btn" class="confirm-btn">✦ CONFIRM</button>
+
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            const MAP_COUNT = 5;
+            const defaultMaps = [
+                { name: 'Inferno', ct: '13', t: '8' },
+                { name: 'Mirage',  ct: '11', t: '13' },
+                { name: 'Anubis',  ct: '13', t: '10' },
+                { name: '',        ct: '',   t: '' },
+                { name: '',        ct: '',   t: '' },
+            ];
+
+            const tbody = document.getElementById('bd-tbody');
+            function buildRows() {
+                let html = '';
+                for (let i = 0; i < MAP_COUNT; i++) {
+                    const d = defaultMaps[i];
+                    html += `
+                        <tr class="bd-row" data-idx="${i}">
+                            <td><span class="map-num">${i+1}</span></td>
+                            <td>
+                                <input type="text" id="bd-name-${i}" class="map-input" placeholder="Map name" value="${d.name}" data-display="bd-name-d-${i}" />
+                                <span id="bd-name-d-${i}" class="map-name-text hidden"></span>
+                            </td>
+                            <td>
+                                <input type="number" id="bd-ct-${i}" class="score-bd-input" min="0" max="30" value="${d.ct}" data-display="bd-ct-d-${i}" />
+                                <span id="bd-ct-d-${i}" class="score-val ct hidden"></span>
+                            </td>
+                            <td>
+                                <input type="number" id="bd-t-${i}" class="score-bd-input" min="0" max="30" value="${d.t}" data-display="bd-t-d-${i}" />
+                                <span id="bd-t-d-${i}" class="score-val t hidden"></span>
+                            </td>
+                            <td><span id="bd-win-${i}" class="win-icon"></span></td>
+                        </tr>
+                    `;
+                }
+                tbody.innerHTML = html;
+            }
+            buildRows();
+
+            const confirmBtn = document.getElementById('confirm-btn');
+
+            /* ---- Sync team names to headers ---- */
+            function syncTeamNames() {
+                const teamA = document.getElementById('ct-name-input').value || 'Team A';
+                const teamB = document.getElementById('t-name-input').value || 'Team B';
+                document.getElementById('result-header-a').textContent = teamA;
+                document.getElementById('result-header-b').textContent = teamB;
+                document.querySelector('.team-badge.ct .side').textContent = teamA;
+                document.querySelector('.team-badge.t .side').textContent = teamB;
+            }
+
+            /* ---- Live update winner/final score ---- */
+            function updateLiveDisplay() {
+                const winnerInput = document.getElementById('winner-input');
+                const teamA = document.getElementById('ct-name-input').value || 'Team A';
+                const teamB = document.getElementById('t-name-input').value || 'Team B';
+
+                let ctWins = 0, tWins = 0;
+                for (let i = 0; i < MAP_COUNT; i++) {
+                    const name = document.getElementById('bd-name-' + i).value.trim();
+                    if (!name) continue;
+                    const ct = parseInt(document.getElementById('bd-ct-' + i).value, 10) || 0;
+                    const t  = parseInt(document.getElementById('bd-t-' + i).value, 10) || 0;
+                    if (ct > t) ctWins++;
+                    else if (t > ct) tWins++;
+                }
+                // Update win icons live — show team name of winner
+                for (let i = 0; i < MAP_COUNT; i++) {
+                    const name = document.getElementById('bd-name-' + i).value.trim();
+                    const ct = parseInt(document.getElementById('bd-ct-' + i).value, 10) || 0;
+                    const t  = parseInt(document.getElementById('bd-t-' + i).value, 10) || 0;
+                    const winEl = document.getElementById('bd-win-' + i);
+                    if (!name) { winEl.textContent = ''; continue; }
+                    if (ct > t) { winEl.textContent = '★'; winEl.className = 'win-icon win-ct'; }
+                    else if (t > ct) { winEl.textContent = '★'; winEl.className = 'win-icon win-t'; }
+                    else { winEl.textContent = '—'; winEl.className = 'win-icon'; }
+                }
+
+                // Update final score inputs
+                document.getElementById('final-ct-input').value = ctWins;
+                document.getElementById('final-t-input').value = tWins;
+
+                // Auto-detect winner name
+                if (ctWins > tWins) {
+                    winnerInput.value = teamA;
+                } else if (tWins > ctWins) {
+                    winnerInput.value = teamB;
+                }
+
+                syncTeamNames();
+            }
+
+            document.addEventListener('input', updateLiveDisplay);
+            document.addEventListener('change', updateLiveDisplay);
+            updateLiveDisplay();
+
+            /* ---- Confirm ---- */
+            const confirmAll = function() {
+                // Process all data-display fields
+                const inputs = document.querySelectorAll('[data-display]');
+                inputs.forEach(function(input) {
+                    const displayId = input.getAttribute('data-display');
+                    const display = document.getElementById(displayId);
+                    if (!display) return;
+                    display.textContent = input.value || input.placeholder || '—';
+                    input.classList.add('hidden');
+                    display.classList.remove('hidden');
+                    display.classList.add('fade-in');
+                });
+
+                // Process map rows — hide empty ones
+                for (let i = 0; i < MAP_COUNT; i++) {
+                    const nameInput = document.getElementById('bd-name-' + i);
+                    const nameVal = nameInput.value.trim();
+                    if (!nameVal) {
+                        const row = nameInput.closest('tr');
+                        if (row) row.classList.add('hidden');
+                        continue;
+                    }
+                    // Name already handled by data-display above, but scores need win icon handled
+                    const teamA = document.getElementById('ct-name-input').value || 'Team A';
+                    const teamB = document.getElementById('t-name-input').value || 'Team B';
+                    const ctVal = parseInt(document.getElementById('bd-ct-' + i).value, 10) || 0;
+                    const tVal  = parseInt(document.getElementById('bd-t-' + i).value, 10) || 0;
+                    const winEl = document.getElementById('bd-win-' + i);
+                    if (ctVal > tVal) { winEl.textContent = '★'; winEl.className = 'win-icon win-ct fade-in'; }
+                    else if (tVal > ctVal) { winEl.textContent = '★'; winEl.className = 'win-icon win-t fade-in'; }
+                    else { winEl.textContent = '—'; winEl.className = 'win-icon fade-in'; }
+                }
+
+                confirmBtn.classList.add('hidden');
+            };
+
+            confirmBtn.addEventListener('click', confirmAll);
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+                    e.preventDefault();
+                }
+            });
+
+        })();
+    </script>
+</body>
+</html>
