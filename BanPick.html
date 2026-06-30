@@ -174,11 +174,12 @@
             background-position: center 30%;
             box-shadow: var(--shadow-sm);
             cursor: default;
-            transition: opacity 0.5s ease, filter var(--transition);
+            transition: opacity 0.6s ease, transform 0.6s ease, filter var(--transition);
             border: 1px solid var(--border-color);
         }
         .map-row.hidden-map {
             opacity: 0 !important;
+            transform: translateY(18px);
             pointer-events: none;
         }
         /* Dark gradient overlay for readability */
@@ -660,13 +661,13 @@
                     row.classList.add('banned');
                     const tag = document.createElement('span');
                     tag.className = 'status-tag banned';
-                    tag.textContent = `BANNED ${tn(s.banned)}`;
+                    tag.textContent = `${tn(s.banned)} BANNED`;
                     st.appendChild(tag);
                 } else if (s.picked !== null) {
                     row.classList.add('picked');
                     const pi = document.createElement('span');
                     pi.className = 'status-tag picked-info';
-                    pi.textContent = `PICK ${tn(s.picked)}`;
+                    pi.textContent = `${tn(s.picked)} PICKED`;
                     st.appendChild(pi);
                     if (s.ctTeam !== null) {
                         const ct = s.ctTeam;
@@ -708,17 +709,20 @@
                     ac.appendChild(pb);
                 }
 
-                // Decider
-                const unmarked = MAPS.filter(m => M[m.id].banned === null && M[m.id].picked === null);
-                if (unmarked.length === 1 && unmarked[0].id === mapId) {
-                    row.classList.add('decider');
-                    if (!st.querySelector('.decider-tag')) {
-                        const dt = document.createElement('span');
-                        dt.className = 'status-tag decider-tag';
-                        dt.textContent = 'DECIDER';
-                        st.appendChild(dt);
+                // Decider — during animation all unmarked maps are deciders
+                if (s.banned === null && s.picked === null) {
+                    const unmarked = MAPS.filter(m => M[m.id].banned === null && M[m.id].picked === null);
+                    const isDecider = isAnimating || (unmarked.length === 1 && unmarked[0].id === mapId);
+                    if (isDecider) {
+                        row.classList.add('decider');
+                        if (!st.querySelector('.decider-tag')) {
+                            const dt = document.createElement('span');
+                            dt.className = 'status-tag decider-tag';
+                            dt.textContent = 'DECIDER';
+                            st.appendChild(dt);
+                        }
+                        ac.innerHTML = '';
                     }
-                    ac.innerHTML = '';
                 }
             }
 
@@ -789,13 +793,20 @@
                 updateStats();
             }
 
+            // ===== Animation flag =====
+            let isAnimating = false;
+
             // ===== Play — in-place animation =====
             playBtn.addEventListener('click', startAnim);
 
             async function startAnim() {
                 playBtn.disabled = true;
+                isAnimating = true;
 
-                // Build BP order: each map appears once, in first-touched order
+                // Re-render so all unmarked maps show DECIDER (not Ban/Pick buttons)
+                updateAll();
+
+                // Build BP order: each map once, in first-touched order
                 const order = [];
                 const seen = new Set();
                 timeline.forEach(e => {
@@ -813,15 +824,26 @@
 
                 // Hide all map rows
                 document.querySelectorAll('.map-row').forEach(r => r.classList.add('hidden-map'));
-                await delay(500);
+                await delay(400);
 
-                // Show them one by one in BP order (team names & grid stay visible)
+                // ----- 5 second silent wait -----
+                await delay(5000);
+
+                // Reorder DOM so maps appear top-to-bottom in BP sequence
+                const fragment = document.createDocumentFragment();
+                order.forEach(mapId => {
+                    const row = $('map-' + mapId);
+                    if (row) fragment.appendChild(row); // detach & queue
+                });
+                mapsContainer.appendChild(fragment); // re-insert in BP order
+
+                // Show them one by one from top to bottom
                 for (const mapId of order) {
-                    await delay(600);
+                    await delay(900);
                     const row = $('map-' + mapId);
                     if (row) row.classList.remove('hidden-map');
                 }
-                // Done — no button, no overlay, user refreshes to reset
+                // Done — user refreshes manually to reset
             }
 
             // ===== Init =====
