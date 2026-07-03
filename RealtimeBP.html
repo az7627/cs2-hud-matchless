@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root {
             --bg-primary: #070c1a;
@@ -96,8 +97,8 @@
         @keyframes mapReveal{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 
         .map-left{display:flex;align-items:center;gap:.8em;flex:1;min-width:0}
-        .map-name{font-family:var(--font-display);font-weight:700;font-size:clamp(.7rem,1.1vw,1.3rem);color:var(--text-primary);text-shadow:0 2px 8px rgba(0,0,0,.6);white-space:nowrap}
-        .map-sub{font-size:clamp(.4rem,.5vw,.6rem);color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+        .map-name{font-family:var(--font-display);font-weight:700;font-size:clamp(1rem,1.6vw,1.9rem);color:var(--text-primary);text-shadow:0 2px 8px rgba(0,0,0,.6);white-space:nowrap}
+        .map-sub{font-size:clamp(0.5rem,0.6vw,0.7rem);color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap}
 
         .map-right{display:flex;align-items:center;gap:.4em;background:rgba(7,12,26,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:var(--radius-sm);border:1px solid rgba(255,255,255,.04);padding:.25em .6em;flex-shrink:0;max-width:60%}
         .tag{font-family:var(--font-display);font-weight:600;font-size:clamp(.42rem,.55vw,.65rem);letter-spacing:.06em;text-transform:uppercase;padding:.12em .5em;border-radius:99px;white-space:nowrap;border:1px solid}
@@ -198,7 +199,7 @@
 
             <!-- Top bar -->
             <div class="top-bar">
-                <button class="admin-btn" id="adminBtn">⚙ Admin</button>
+                <button class="admin-btn" id="adminBtn"><i class="fa-solid fa-gear"></i> Admin</button>
                 <div class="bp-title">BAN & <span class="hl">PICK</span></div>
                 <div class="bo-badge" id="boBadge">BO3</div>
             </div>
@@ -220,7 +221,7 @@
 
             <!-- Status bar -->
             <div class="status-bar">
-                <button class="spectate-btn" id="spectateBtn">👁 Spectate</button>
+                <button class="spectate-btn" id="spectateBtn"><i class="fa-solid fa-eye"></i> Spectate</button>
                 <div class="turn-info" id="turnInfo">Waiting for players...</div>
             </div>
 
@@ -370,10 +371,10 @@
             const specBtn = $('spectateBtn');
             specBtn.style.display = 'inline-block';
             if (spectatorMode) {
-                specBtn.textContent = '🔍 Spectating';
+                specBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Spectating';
                 specBtn.classList.add('active');
             } else {
-                specBtn.textContent = '👁 Spectate';
+                specBtn.innerHTML = '<i class="fa-solid fa-eye"></i> Spectate';
                 specBtn.classList.remove('active');
             }
 
@@ -387,7 +388,7 @@
                 const action = state.current_action === 'ban' ? 'BAN' : state.current_action === 'pick' ? 'PICK' : 'CHOOSE SIDE';
                 turnInfo.innerHTML = `<span class="${tc}">${tn}</span> to <span class="acting">${action}</span>${state.remaining_in_step > 1 ? ` (${state.remaining_in_step} left)` : ''}`;
             } else if (state.phase === 'complete') {
-                turnInfo.textContent = '✅ BP Complete';
+                turnInfo.innerHTML = '<i class="fa-solid fa-check"></i> BP Complete';
             }
 
             // ── Turn panel: always visible during bp/side_pick ───────────
@@ -413,8 +414,8 @@
                             const tStyle = myVote === 't' ? ';box-shadow:0 0 0 2px var(--accent-gold)' : '';
                             $('voteTimer').innerHTML =
                                 '<div style="display:flex;align-items:center;gap:.6em">' +
-                                '<button class="tag action ct" style="font-size:clamp(.65rem,.8vw,1rem);padding:.2em .7em;cursor:pointer' + ctStyle + '" id="voteSideCtBtn">&#x1F535; CT' + ctExtra + '</button>' +
-                                '<button class="tag action t" style="font-size:clamp(.65rem,.8vw,1rem);padding:.2em .7em;cursor:pointer' + tStyle + '" id="voteSideTBtn">&#x1F7E0; T' + tExtra + '</button>' +
+                                '<button class="tag action ct" style="font-size:clamp(.65rem,.8vw,1rem);padding:.2em .7em;cursor:pointer' + ctStyle + '" id="voteSideCtBtn"><i class="fa-solid fa-circle" style="color:var(--t1-blue);font-size:.6em"></i> CT' + ctExtra + '</button>' +
+                                '<button class="tag action t" style="font-size:clamp(.65rem,.8vw,1rem);padding:.2em .7em;cursor:pointer' + tStyle + '" id="voteSideTBtn"><i class="fa-solid fa-circle" style="color:var(--t2-orange);font-size:.6em"></i> T' + tExtra + '</button>' +
                                 '</div>';
                             $('voteSideCtBtn').onclick = function(){ socket.emit('action', { map_id: 'ct' }); };
                             $('voteSideTBtn').onclick = function(){ socket.emit('action', { map_id: 't' }); };
@@ -428,8 +429,8 @@
                         if (state.phase === 'side_pick') {
                             $('turnPanelText').innerHTML = 'Your turn to <span style="color:var(--accent-green)">CHOOSE SIDE</span>';
                             $('voteTimer').innerHTML =
-                                '<button class="tag action ct" style="font-size:clamp(.65rem,.8vw,1rem);padding:.2em .7em;cursor:pointer" id="sideCtBtn">&#x1F535; CT</button>' +
-                                '<button class="tag action t" style="font-size:clamp(.65rem,.8vw,1rem);padding:.2em .7em;cursor:pointer" id="sideTBtn">&#x1F7E0; T</button>';
+                                '<button class="tag action ct" style="font-size:clamp(.65rem,.8vw,1rem);padding:.2em .7em;cursor:pointer" id="sideCtBtn"><i class="fa-solid fa-circle" style="color:var(--t1-blue);font-size:.6em"></i> CT</button>' +
+                                '<button class="tag action t" style="font-size:clamp(.65rem,.8vw,1rem);padding:.2em .7em;cursor:pointer" id="sideTBtn"><i class="fa-solid fa-circle" style="color:var(--t2-orange);font-size:.6em"></i> T</button>';
                             $('sideCtBtn').onclick = function(){ socket.emit('action', { map_id: 'ct' }); };
                             $('sideTBtn').onclick = function(){ socket.emit('action', { map_id: 't' }); };
                         } else {
@@ -630,7 +631,10 @@
             function playerRow(p) {
                 const status = confirmations[p.sid];
                 const isMe = p.sid === mySid;
-                const icon = status === true ? '✓' : status === false ? '✗' : '○';
+                let icon;
+                if (status === true) icon = '<i class="fa-solid fa-check" style="font-size:.7em"></i>';
+                else if (status === false) icon = '<i class="fa-solid fa-xmark" style="font-size:.7em"></i>';
+                else icon = '<i class="fa-regular fa-circle" style="font-size:.7em"></i>';
                 const cls = status === true ? 'rp-yes' : status === false ? 'rp-no' : 'rp-wait';
                 const meTag = isMe ? ' (You)' : '';
                 return `<div class="rp-row ${cls}">${icon} ${p.name}${meTag}</div>`;
@@ -651,8 +655,8 @@
                     <div class="rv-footer">
                         <span class="ready-timer">${state.ready_remaining}s</span>
                         <div class="rv-actions">
-                            <button class="modal-btn gold" id="rvYesBtn">✓ Ready</button>
-                            <button class="modal-btn gray" id="rvNoBtn">✗ Not Ready</button>
+                            <button class="modal-btn gold" id="rvYesBtn"><i class="fa-solid fa-check"></i> Ready</button>
+                            <button class="modal-btn gray" id="rvNoBtn"><i class="fa-solid fa-xmark"></i> Not Ready</button>
                         </div>
                     </div>
                 </div>
@@ -698,8 +702,8 @@
                             <div class="ready-confirm-text">${initName} wants to start! Are you ready?</div>
                             <span class="ready-timer">${state.ready_remaining}s</span>
                             <div class="ready-confirm-actions">
-                                <button class="modal-btn gold" id="readyConfirmYes">✓ Ready</button>
-                                <button class="modal-btn gray" id="readyConfirmNo">✗ Cancel</button>
+                                <button class="modal-btn gold" id="readyConfirmYes"><i class="fa-solid fa-check"></i> Ready</button>
+                                <button class="modal-btn gray" id="readyConfirmNo"><i class="fa-solid fa-xmark"></i> Cancel</button>
                             </div>
                         </div>
                     `;

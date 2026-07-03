@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root {
             --bg-primary: #070c1a;
@@ -580,7 +581,7 @@
                     <div class="team-score-big" id="top-t-score">8</div>
                 </div>
             </div>
-            <div class="top-winner" id="top-winner">✓ WINNER: Team Liquid</div>
+            <div class="top-winner" id="top-winner"><i class="fa-solid fa-check"></i> WINNER: Team Liquid</div>
 
             <!-- Series Score -->
             <div class="series-score">
@@ -652,7 +653,7 @@
             </div>
 
             <!-- Confirm -->
-            <button id="confirm-btn" class="confirm-btn">✦ CONFIRM</button>
+            <button id="confirm-btn" class="confirm-btn"><i class="fa-solid fa-star"></i> CONFIRM</button>
 
         </div>
     </div>
@@ -749,7 +750,7 @@
                 if (ctNum > tNum) winner = teamA;
                 else if (tNum > ctNum) winner = teamB;
                 else winner = '—';
-                document.getElementById('top-winner').textContent = '✓ WINNER: ' + winner;
+                document.getElementById('top-winner').innerHTML = '<i class="fa-solid fa-check"></i> WINNER: ' + winner;
             }
 
             // Live-update team names, top result, series score
@@ -928,7 +929,7 @@
                     // Status badge
                     const radio = document.getElementById('finished-' + i);
                     if (radio && radio.checked) {
-                        statusDisp.innerHTML = '<span class="arrow">◀</span> JUST ENDED';
+                        statusDisp.innerHTML = '<span class="arrow"><i class="fa-solid fa-caret-left"></i></span> JUST ENDED';
                         statusDisp.style.display = '';
                         // Highlight row
                         const row = nameInput.closest('tr');

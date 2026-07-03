@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root {
             --bg-primary: #070c1a;
@@ -397,7 +398,7 @@
 
             <!-- Winner -->
             <div class="winner-section">
-                <div class="trophy">🏆</div>
+                <div class="trophy"><i class="fa-solid fa-trophy"></i></div>
                 <div class="winner-label">Champion</div>
                 <input type="text" id="winner-input" class="winner-name-input" placeholder="Winner" value="Team Liquid" data-display="winner-display" />
                 <span id="winner-display" class="winner-name winner-name-display hidden"></span>
@@ -445,7 +446,7 @@
             </div>
 
             <!-- Confirm -->
-            <button id="confirm-btn" class="confirm-btn">✦ CONFIRM</button>
+            <button id="confirm-btn" class="confirm-btn"><i class="fa-solid fa-star"></i> CONFIRM</button>
 
         </div>
     </div>
@@ -525,8 +526,8 @@
                     const t  = parseInt(document.getElementById('bd-t-' + i).value, 10) || 0;
                     const winEl = document.getElementById('bd-win-' + i);
                     if (!name) { winEl.textContent = ''; continue; }
-                    if (ct > t) { winEl.textContent = '★'; winEl.className = 'win-icon win-ct'; }
-                    else if (t > ct) { winEl.textContent = '★'; winEl.className = 'win-icon win-t'; }
+                    if (ct > t) { winEl.innerHTML = '<i class="fa-solid fa-star"></i>'; winEl.className = 'win-icon win-ct'; }
+                    else if (t > ct) { winEl.innerHTML = '<i class="fa-solid fa-star"></i>'; winEl.className = 'win-icon win-t'; }
                     else { winEl.textContent = '—'; winEl.className = 'win-icon'; }
                 }
 
@@ -577,8 +578,8 @@
                     const ctVal = parseInt(document.getElementById('bd-ct-' + i).value, 10) || 0;
                     const tVal  = parseInt(document.getElementById('bd-t-' + i).value, 10) || 0;
                     const winEl = document.getElementById('bd-win-' + i);
-                    if (ctVal > tVal) { winEl.textContent = '★'; winEl.className = 'win-icon win-ct fade-in'; }
-                    else if (tVal > ctVal) { winEl.textContent = '★'; winEl.className = 'win-icon win-t fade-in'; }
+                    if (ctVal > tVal) { winEl.innerHTML = '<i class="fa-solid fa-star"></i>'; winEl.className = 'win-icon win-ct fade-in'; }
+                    else if (tVal > ctVal) { winEl.innerHTML = '<i class="fa-solid fa-star"></i>'; winEl.className = 'win-icon win-t fade-in'; }
                     else { winEl.textContent = '—'; winEl.className = 'win-icon fade-in'; }
                 }
 
