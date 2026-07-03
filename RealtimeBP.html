@@ -81,18 +81,19 @@
         .maps-area::-webkit-scrollbar-track{background:transparent}
         .maps-area::-webkit-scrollbar-thumb{background:var(--border-color);border-radius:2px}
 
-        .map-card{position:relative;flex-shrink:0;height:7.5vh;min-height:44px;border-radius:var(--radius);overflow:hidden;background-size:cover;background-position:center 30%;border:1px solid var(--border-color);cursor:default;transition:opacity .3s,transform .3s,box-shadow .3s;display:flex;align-items:center;justify-content:space-between;padding:0 1vw 0 1.2vw}
+        .map-card{position:relative;flex-shrink:0;height:clamp(56px,9vh,100px);min-height:56px;border-radius:var(--radius);overflow:hidden;background-size:cover;background-position:center 30%;border:1px solid var(--border-color);cursor:default;transition:opacity .3s,transform .3s,box-shadow .3s;display:flex;align-items:center;justify-content:space-between;padding:0 1.2vw 0 1.5vw}
         .map-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(7,12,26,.88) 0%,rgba(7,12,26,.4) 45%,rgba(7,12,26,.15) 70%,rgba(7,12,26,.05) 100%);z-index:1;pointer-events:none}
         .map-card>*{position:relative;z-index:2}
         .map-card.banned{filter:grayscale(1);opacity:.55;border-color:#333}
         .map-card.banned::before{background:linear-gradient(135deg,rgba(7,12,26,.95),rgba(7,12,26,.7) 60%,rgba(7,12,26,.4))}
         .map-card.decider{border-color:var(--accent-gold);box-shadow:0 0 20px rgba(255,215,0,.05)}
         .map-card.clickable{cursor:pointer}
-        .map-card.clickable:hover{transform:scale(1.01);border-color:var(--border-light)}
+        .map-card.clickable:hover{border-color:var(--border-light);box-shadow:0 0 12px rgba(255,255,255,.03)}
         .map-card.clickable.t1-hover:hover{border-color:var(--t1-blue);box-shadow:0 0 20px var(--t1-glow)}
         .map-card.clickable.t2-hover:hover{border-color:var(--t2-orange);box-shadow:0 0 20px var(--t2-glow)}
         .map-card.pick-anim{animation:pickPulse .6s ease}
         @keyframes pickPulse{0%{transform:scale(1)}50%{transform:scale(1.02);border-color:var(--accent-green)}100%{transform:scale(1)}}
+        @keyframes mapReveal{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 
         .map-left{display:flex;align-items:center;gap:.8em;flex:1;min-width:0}
         .map-name{font-family:var(--font-display);font-weight:700;font-size:clamp(.7rem,1.1vw,1.3rem);color:var(--text-primary);text-shadow:0 2px 8px rgba(0,0,0,.6);white-space:nowrap}
@@ -116,19 +117,49 @@
         .tag.action.t2-a:hover{background:rgba(245,158,11,.15)}
         .tag.action.voted{background:rgba(255,215,0,.1);border-color:rgba(255,215,0,.2);color:var(--accent-gold)}
 
-        .map-votes{display:flex;gap:.15em;margin-left:.3em}
-        .vote-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
-        .vote-dot.v1{background:var(--t1-blue)}
-        .vote-dot.v2{background:var(--t2-orange)}
+        .map-votes{display:flex;gap:.2em;margin-left:.3em;flex-wrap:wrap;max-width:180px}
+        .vote-name{font-size:clamp(.35rem,.45vw,.55rem);padding:.08em .4em;border-radius:3px;background:rgba(255,255,255,.06);color:var(--text-secondary);white-space:nowrap}
+        .vote-name.t1{background:rgba(59,130,246,.15);color:var(--t1-blue)}
+        .vote-name.t2{background:rgba(245,158,11,.15);color:var(--t2-orange)}
+        .vote-name.me{font-weight:700;box-shadow:0 0 0 1px var(--accent-gold)}
 
         /* ── Turn panel (for acting team) ── */
         .turn-panel{flex-shrink:0;width:100%;background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);padding:.6vh 1.2vw;display:flex;align-items:center;justify-content:space-between;gap:.8em;opacity:0;transition:opacity .3s;max-height:0;overflow:hidden}
-        .turn-panel.active{opacity:1;max-height:8vh;padding:.6vh 1.2vw}
+        .turn-panel.active{opacity:1;max-height:none;padding:.8vh 1.2vw}
         .turn-panel .info{font-family:var(--font-display);font-size:clamp(.55rem,.7vw,.85rem);color:var(--text-primary);letter-spacing:.08em}
         .turn-panel .info .hl{font-weight:700}
         .turn-panel .timer{font-family:var(--font-display);font-weight:700;font-size:clamp(1rem,1.5vw,1.8rem);color:var(--accent-gold);letter-spacing:.05em}
         .turn-panel .cancel-vote{font-family:var(--font-body);font-size:clamp(.45rem,.55vw,.65rem);color:var(--text-muted);cursor:pointer;background:none;border:none;padding:.2em .5em}
         .turn-panel .cancel-vote:hover{color:var(--text-secondary)}
+
+        /* ── Ready area (captain start flow) ── */
+        .ready-area{flex-shrink:0;width:100%;display:none;align-items:center;justify-content:center;gap:1em;padding:.4vh 0;min-height:0}
+        .ready-area.show{display:flex;flex-direction:column;gap:.6em}
+        .start-btn{font-family:var(--font-display);font-weight:800;font-size:clamp(1rem,1.8vw,2.2rem);letter-spacing:.3em;text-transform:uppercase;padding:.35em 1.8em;border-radius:var(--radius);cursor:pointer;transition:all var(--transition);border:2px solid var(--accent-gold);background:rgba(255,215,0,.06);color:var(--accent-gold);min-width:200px}
+        .start-btn:hover{background:rgba(255,215,0,.15);box-shadow:0 0 30px rgba(255,215,0,.1);transform:scale(1.02)}
+        .start-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+        .start-btn.cancel{border-color:rgba(255,80,80,.4);color:#ff5050;background:rgba(255,80,80,.06)}
+        .start-btn.cancel:hover{background:rgba(255,80,80,.12);box-shadow:0 0 30px rgba(255,80,80,.08)}
+        .ready-info{font-family:var(--font-display);font-size:clamp(.55rem,.75vw,.85rem);color:var(--text-secondary);letter-spacing:.12em;text-transform:uppercase}
+        .ready-timer{font-family:var(--font-display);font-weight:700;font-size:clamp(1.2rem,1.8vw,2.2rem);color:var(--accent-gold);letter-spacing:.05em}
+        .ready-confirm-box{display:flex;flex-direction:column;align-items:center;gap:.4em;background:var(--bg-card);border:1px solid var(--accent-gold);border-radius:var(--radius);padding:1.2vh 2vw}
+        .ready-confirm-text{font-family:var(--font-display);font-size:clamp(.6rem,.8vw,.95rem);color:var(--text-primary);letter-spacing:.08em}
+        .ready-confirm-actions{display:flex;gap:.8em;margin-top:.2em}
+        .ready-confirm-actions .modal-btn{font-size:clamp(.6rem,.75vw,.9rem);padding:.35em 1.4em}
+        .ready-waiting-text{font-family:var(--font-display);font-size:clamp(.55rem,.7vw,.85rem);color:var(--text-secondary);letter-spacing:.1em}
+
+        /* ── Ready voting UI (team mode 4+5) ── */
+        .ready-voting-wrap{display:flex;flex-direction:column;align-items:center;gap:.4em;width:100%;max-width:600px}
+        .rv-cols{display:flex;gap:1.5vw;width:100%}
+        .rv-col{flex:1;background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);padding:.6vh .8vw}
+        .rv-team-name{font-family:var(--font-display);font-weight:700;font-size:clamp(.55rem,.7vw,.85rem);letter-spacing:.08em;margin-bottom:.25em;display:flex;justify-content:space-between}
+        .rv-count{font-weight:500;font-size:clamp(.45rem,.55vw,.7rem);color:var(--text-muted)}
+        .rp-row{font-size:clamp(.45rem,.55vw,.7rem);padding:.12em .3em;border-radius:3px;margin:.08em 0;display:flex;align-items:center;gap:.3em}
+        .rp-yes{color:var(--accent-green)}
+        .rp-no{color:#ff5050}
+        .rp-wait{color:var(--text-muted)}
+        .rv-footer{display:flex;align-items:center;justify-content:center;gap:1.2em;width:100%;margin-top:.2em}
+        .rv-actions{display:flex;gap:.5em}
 
         /* ── Dialogs ── */
         .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:100}
@@ -157,7 +188,7 @@
         @media(max-width:768px){
             .screen{padding:1.5vh 3vw}
             .team-card{padding:.6vh 2vw}
-            .map-card{height:6.5vh}
+            .map-card{height:7.5vh;min-height:48px}
         }
     </style>
 </head>
@@ -200,6 +231,9 @@
                 <button class="cancel-vote" id="cancelVoteBtn" style="display:none">Cancel Vote</button>
             </div>
 
+            <!-- Ready start area (captain start flow) -->
+            <div class="ready-area" id="readyArea"></div>
+
             <!-- Maps -->
             <div class="maps-area" id="mapsArea"></div>
 
@@ -226,6 +260,9 @@
         let myName = '';
         let adminAuthed = false;
         let isObserver = false;
+        let spectatorMode = false;  // true = sequential reveal (BanPick style)
+        let renderedMaps = {};      // tracks which maps have been rendered (for new-map animation)
+        let lastPhase = '';         // to detect phase transitions
 
         // ── DOM ────────────────────────────────────────────────────────
         const $ = id => document.getElementById(id);
@@ -283,9 +320,19 @@
             closeModal();
         });
 
+        socket.on('sid', data => {
+            mySid = data;
+        });
+
         // ── Render ─────────────────────────────────────────────────────
         function render() {
             if (!state) return;
+
+            // Reset map tracking when BP starts fresh
+            if (lastPhase === 'idle' && state.phase === 'bp') {
+                renderedMaps = {};
+            }
+            lastPhase = state.phase;
 
             // Team names
             $('team1Name').textContent = state.team1_name;
@@ -319,16 +366,15 @@
                 t2btn.disabled = true;
             }
 
-            // Spectate button
+            // Spectate button — toggles sequential reveal mode
             const specBtn = $('spectateBtn');
-            if (isObserver) {
-                specBtn.textContent = '👁 Observing';
+            specBtn.style.display = 'inline-block';
+            if (spectatorMode) {
+                specBtn.textContent = '🔍 Spectating';
                 specBtn.classList.add('active');
-            } else if (myTeam === 0) {
+            } else {
                 specBtn.textContent = '👁 Spectate';
                 specBtn.classList.remove('active');
-            } else {
-                specBtn.style.display = 'none';
             }
 
             // Turn info
@@ -344,33 +390,71 @@
                 turnInfo.textContent = '✅ BP Complete';
             }
 
-            // Turn panel
+            // ── Turn panel: always visible during bp/side_pick ───────────
             const panel = $('turnPanel');
-            const isMyTurn = (myTeam === state.current_team && state.phase === 'bp') ||
-                             (myTeam === state.current_team && state.phase === 'side_pick');
-            const canAct = (myTeam > 0 && (state.phase === 'bp' || state.phase === 'side_pick'));
+            const isMyTurn = (myTeam === state.current_team && (state.phase === 'bp' || state.phase === 'side_pick'));
+            const inBP = (state.phase === 'bp' || state.phase === 'side_pick');
 
-            if (canAct) {
-                if (state.vote_active && state.entry_mode === 'team') {
+            if (inBP && myTeam > 0) {
+                if (isMyTurn) {
+                    // ── My team's turn: full interactive UI ──────────────
                     panel.classList.add('active');
-                    const isMySidePick = state.phase === 'side_pick';
-                    const actionLabel = state.current_action === 'ban' ? 'BAN' : state.current_action === 'pick' ? 'PICK' : 'SIDE';
-                    $('turnPanelText').innerHTML = `VOTE: ${actionLabel} <span style="color:var(--accent-gold)">${state.vote_remaining}s</span>`;
-                    $('voteTimer').textContent = `${state.vote_remaining}s`;
-                    $('cancelVoteBtn').style.display = 'none';
-                } else if (isMyTurn && state.entry_mode === 'captain') {
-                    panel.classList.add('active');
-                    const actionLabel = state.current_action === 'ban' ? 'BAN' : state.current_action === 'pick' ? 'PICK' : 'CHOOSE SIDE';
-                    $('turnPanelText').innerHTML = `Your turn to <span style="color:var(--accent-green)">${actionLabel}</span>`;
-                    $('voteTimer').textContent = '';
-                    $('cancelVoteBtn').style.display = 'none';
-                } else if (myTeam > 0 && state.entry_mode === 'team' && !state.vote_active) {
-                    panel.classList.add('active');
-                    $('turnPanelText').textContent = 'Waiting for vote to start...';
-                    $('voteTimer').textContent = '';
-                    $('cancelVoteBtn').style.display = 'none';
+                    if (state.vote_active && state.entry_mode === 'team') {
+                        $('cancelVoteBtn').style.display = 'none';
+                        if (state.phase === 'side_pick') {
+                            $('turnPanelText').innerHTML = 'VOTE: <span style="color:var(--accent-green)">CHOOSE SIDE</span> <span style="color:var(--accent-gold)">' + state.vote_remaining + 's</span>';
+                            // Build side-vote buttons with voter counts
+                            const ctVoters = getSideVotersFor('ct');
+                            const tVoters = getSideVotersFor('t');
+                            const myVote = getMySideVote();
+                            const ctExtra = ctVoters.length ? ' (' + ctVoters.map(function(v){return v.name}).join(',') + ')' : '';
+                            const tExtra = tVoters.length ? ' (' + tVoters.map(function(v){return v.name}).join(',') + ')' : '';
+                            const ctStyle = myVote === 'ct' ? ';box-shadow:0 0 0 2px var(--accent-gold)' : '';
+                            const tStyle = myVote === 't' ? ';box-shadow:0 0 0 2px var(--accent-gold)' : '';
+                            $('voteTimer').innerHTML =
+                                '<div style="display:flex;align-items:center;gap:.6em">' +
+                                '<button class="tag action ct" style="font-size:clamp(.65rem,.8vw,1rem);padding:.2em .7em;cursor:pointer' + ctStyle + '" id="voteSideCtBtn">&#x1F535; CT' + ctExtra + '</button>' +
+                                '<button class="tag action t" style="font-size:clamp(.65rem,.8vw,1rem);padding:.2em .7em;cursor:pointer' + tStyle + '" id="voteSideTBtn">&#x1F7E0; T' + tExtra + '</button>' +
+                                '</div>';
+                            $('voteSideCtBtn').onclick = function(){ socket.emit('action', { map_id: 'ct' }); };
+                            $('voteSideTBtn').onclick = function(){ socket.emit('action', { map_id: 't' }); };
+                        } else {
+                            var al = state.current_action === 'ban' ? 'BAN' : 'PICK';
+                            $('turnPanelText').innerHTML = 'VOTE: ' + al;
+                            $('voteTimer').textContent = state.vote_remaining + 's';
+                        }
+                    } else if (state.entry_mode === 'captain') {
+                        $('cancelVoteBtn').style.display = 'none';
+                        if (state.phase === 'side_pick') {
+                            $('turnPanelText').innerHTML = 'Your turn to <span style="color:var(--accent-green)">CHOOSE SIDE</span>';
+                            $('voteTimer').innerHTML =
+                                '<button class="tag action ct" style="font-size:clamp(.65rem,.8vw,1rem);padding:.2em .7em;cursor:pointer" id="sideCtBtn">&#x1F535; CT</button>' +
+                                '<button class="tag action t" style="font-size:clamp(.65rem,.8vw,1rem);padding:.2em .7em;cursor:pointer" id="sideTBtn">&#x1F7E0; T</button>';
+                            $('sideCtBtn').onclick = function(){ socket.emit('action', { map_id: 'ct' }); };
+                            $('sideTBtn').onclick = function(){ socket.emit('action', { map_id: 't' }); };
+                        } else {
+                            var al2 = state.current_action === 'ban' ? 'BAN' : 'PICK';
+                            $('turnPanelText').innerHTML = 'Your turn to <span style="color:var(--accent-green)">' + al2 + '</span>';
+                            $('voteTimer').innerHTML = '';
+                        }
+                    } else {
+                        // Team mode, no active vote timer yet
+                        $('turnPanelText').textContent = 'Waiting for vote to start...';
+                        $('voteTimer').textContent = '';
+                        $('cancelVoteBtn').style.display = 'none';
+                    }
                 } else {
-                    panel.classList.remove('active');
+                    // ── Opponent's turn: show timer only ─────────────────
+                    panel.classList.add('active');
+                    $('cancelVoteBtn').style.display = 'none';
+                    var tn = state.current_team === 1 ? state.team1_name : state.team2_name;
+                    var act = state.current_action === 'ban' ? 'BAN' : state.current_action === 'pick' ? 'PICK' : 'CHOOSE SIDE';
+                    $('turnPanelText').innerHTML = '<span>' + tn + '</span> is choosing: <span style="color:var(--accent-green)">' + act + '</span>';
+                    if (state.vote_active && state.vote_remaining > 0) {
+                        $('voteTimer').textContent = state.vote_remaining + 's';
+                    } else {
+                        $('voteTimer').textContent = '';
+                    }
                 }
             } else {
                 panel.classList.remove('active');
@@ -378,6 +462,9 @@
 
             // Maps
             renderMaps();
+
+            // Captain-ready start flow
+            handleReadyState();
         }
 
         // ── Map rendering ──────────────────────────────────────────────
@@ -385,21 +472,36 @@
             const area = $('mapsArea');
             if (!state) return;
 
-            // Which maps to show: all from map_pool, in pool order
             const pool = state.map_pool || [];
 
-            area.innerHTML = pool.map(mapId => {
+            // Build display order from BP history (not original pool order)
+            const displayOrder = [];
+            const seen = new Set();
+            (state.history || []).forEach(h => {
+                if (h.map_id && !seen.has(h.map_id)) {
+                    seen.add(h.map_id);
+                    displayOrder.push(h.map_id);
+                }
+            });
+            // Append remaining pool maps not yet seen
+            pool.forEach(m => { if (!seen.has(m)) displayOrder.push(m); });
+
+            area.innerHTML = displayOrder.map((mapId, idx) => {
                 const mapName = mapId.replace('de_', '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                 const banned = state.banned.find(b => b.map_id === mapId);
                 const picked = state.picked.find(p => p.map_id === mapId);
                 const available = state.available.includes(mapId);
                 const isDecider = state.phase === 'complete' && state.available.length === 1 && state.available[0] === mapId && !banned && !picked;
 
+                // Spectator mode: only show maps that are banned/picked/decider
+                if (spectatorMode && available && !banned && !picked && !isDecider) {
+                    return '';
+                }
+
                 let classes = 'map-card';
                 if (banned) classes += ' banned';
                 if (isDecider) classes += ' decider';
 
-                // Is this map clickable?
                 const isClickable = canInteractWith(mapId);
                 if (isClickable) {
                     classes += ' clickable';
@@ -411,46 +513,46 @@
                 if (banned) {
                     const teamName = banned.by === 1 ? state.team1_name : state.team2_name;
                     const teamCls = banned.by === 1 ? 't1-bg' : 't2-bg';
-                    tags = `<span class="tag ${teamCls}">${teamName} BANNED</span>`;
+                    tags = '<span class="tag ' + teamCls + '">' + teamName + ' BANNED</span>';
                 } else if (picked) {
                     const pickerName = picked.by === 1 ? state.team1_name : state.team2_name;
                     const pickerCls = picked.by === 1 ? 't1-bg' : 't2-bg';
-                    tags = `<span class="tag ${pickerCls}">${pickerName} PICKED</span>`;
+                    tags = '<span class="tag ' + pickerCls + '">' + pickerName + ' PICKED</span>';
                     if (picked.ct_team) {
                         const ctName = picked.ct_team === 1 ? state.team1_name : state.team2_name;
-                        const ctCls = picked.ct_team === 1 ? 'ct' : 'ct';  // CT always blue on the map
                         const tName = picked.ct_team === 1 ? state.team2_name : state.team1_name;
-                        tags += `<span class="tag ct">${ctName} CT</span>`;
-                        tags += `<span class="tag t">${tName} T</span>`;
+                        tags += '<span class="tag ct">' + ctName + ' CT</span>';
+                        tags += '<span class="tag t">' + tName + ' T</span>';
                     }
                 } else if (isDecider) {
-                    tags = `<span class="tag gold">DECIDER</span>`;
+                    tags = '<span class="tag gold">DECIDER</span>';
                 } else if (isClickable) {
-                    const action = state.current_action === 'ban' ? 'BAN' : 'PICK';
+                    const actionText = state.current_action === 'ban' ? 'BAN' : 'PICK';
                     const teamCls = state.current_team === 1 ? 't1-a' : 't2-a';
-                    tags = `<span class="tag action ${teamCls}" data-map="${mapId}">${action}</span>`;
+                    tags = '<span class="tag action ' + teamCls + '" data-map="' + mapId + '">' + actionText + '</span>';
                 } else {
-                    tags = `<span class="tag muted">Available</span>`;
+                    tags = '<span class="tag muted">Available</span>';
                 }
 
                 // Vote indicators
-                const voteCounts = countVotesFor(mapId);
-                if (voteCounts > 0) {
-                    const dots = Array(voteCounts).fill('<span class="vote-dot v1"></span>').join('');
-                    tags += `<span class="map-votes">${dots}</span>`;
+                const voters = getVotersFor(mapId);
+                if (voters.length > 0) {
+                    tags += '<span class="map-votes">' + voters.map(function(v) {
+                        const isMe = v.sid === mySid;
+                        const cls = isMe ? 'vote-name me' : 'vote-name';
+                        const tc = v.team === 1 ? 't1' : 't2';
+                        return '<span class="' + cls + ' ' + tc + '">' + v.name + '</span>';
+                    }).join('') + '</span>';
                 }
 
-                return `
-                    <div class="${classes}" data-map="${mapId}">
-                        <div class="map-left">
-                            <div>
-                                <div class="map-name">${mapName}</div>
-                                <div class="map-sub">${mapId}</div>
-                            </div>
-                        </div>
-                        <div class="map-right">${tags}</div>
-                    </div>
-                `;
+                // Stagger animation — only for new maps in spectator mode
+                const isNew = !renderedMaps[mapId];
+                if (isNew) renderedMaps[mapId] = true;
+                const delay = (idx * 0.04).toFixed(2);
+                const animStyle = (spectatorMode && isNew) ? 'animation:mapReveal .35s ease backwards;animation-delay:' + delay + 's' : '';
+                return '<div class="' + classes + '" data-map="' + mapId + '" style="background-image:url(\'res/' + mapId + '.png\');' + animStyle + '">' +
+                    '<div class="map-left"><div><div class="map-name">' + mapName + '</div><div class="map-sub">' + mapId + '</div></div></div>' +
+                    '<div class="map-right">' + tags + '</div></div>';
             }).join('');
 
             // Attach click handlers for action tags
@@ -484,10 +586,150 @@
             return true;
         }
 
-        function countVotesFor(mapId) {
-            if (!state || !state.votes) return 0;
-            return Object.values(state.votes).filter(v => v.map_id === mapId).length;
+        function getVotersFor(mapId) {
+            if (!state || !state.votes) return [];
+            return Object.entries(state.votes)
+                .filter(([_, v]) => v.map_id === mapId)
+                .map(([sid, v]) => ({ sid, name: v.voter_name || '?', team: v.team }));
         }
+
+        function getSideVotersFor(side) {
+            if (!state || !state.votes || state.current_action !== 'side') return [];
+            const team = state.current_team;
+            return Object.entries(state.votes)
+                .filter(([_, v]) => v.map_id === side && v.action === 'side' && v.team === team)
+                .map(([sid, v]) => ({ sid, name: v.voter_name || '?', team: v.team }));
+        }
+
+        function getMySideVote() {
+            if (!state || !state.votes) return null;
+            const v = state.votes[mySid];
+            if (!v || v.action !== 'side') return null;
+            return v.map_id;  // 'ct' or 't'
+        }
+
+        // ── Captain ready / team vote display helpers ─────────────────
+        function canStart() {
+            // Determine if the current user can press START
+            if (myTeam <= 0) return false;
+            if (state.entry_mode === 'captain') return myRole === 'captain';
+            return true; // team mode — any player can start
+        }
+
+        function buildReadyVotingHTML() {
+            const confirmations = state.ready_confirmations || {};
+            const t1Name = state.team1_name;
+            const t2Name = state.team2_name;
+            const t1Total = state.team1_players.length;
+            const t2Total = state.team2_players.length;
+
+            function countReady(players) {
+                return players.filter(p => confirmations[p.sid] === true).length;
+            }
+
+            function playerRow(p) {
+                const status = confirmations[p.sid];
+                const isMe = p.sid === mySid;
+                const icon = status === true ? '✓' : status === false ? '✗' : '○';
+                const cls = status === true ? 'rp-yes' : status === false ? 'rp-no' : 'rp-wait';
+                const meTag = isMe ? ' (You)' : '';
+                return `<div class="rp-row ${cls}">${icon} ${p.name}${meTag}</div>`;
+            }
+
+            return `
+                <div class="ready-voting-wrap">
+                    <div class="rv-cols">
+                        <div class="rv-col">
+                            <div class="rv-team-name">${t1Name} <span class="rv-count">${countReady(state.team1_players)}/${t1Total}</span></div>
+                            ${state.team1_players.map(p => playerRow(p)).join('')}
+                        </div>
+                        <div class="rv-col">
+                            <div class="rv-team-name">${t2Name} <span class="rv-count">${countReady(state.team2_players)}/${t2Total}</span></div>
+                            ${state.team2_players.map(p => playerRow(p)).join('')}
+                        </div>
+                    </div>
+                    <div class="rv-footer">
+                        <span class="ready-timer">${state.ready_remaining}s</span>
+                        <div class="rv-actions">
+                            <button class="modal-btn gold" id="rvYesBtn">✓ Ready</button>
+                            <button class="modal-btn gray" id="rvNoBtn">✗ Not Ready</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleReadyState() {
+            const area = $('readyArea');
+            if (!state || !area) return;
+
+            // Only show in idle phase
+            if (state.phase !== 'idle') {
+                area.classList.remove('show');
+                area.innerHTML = '';
+                return;
+            }
+
+            const curPhase = state.ready_phase;
+
+            if (curPhase === 'awaiting_start') {
+                area.classList.add('show');
+                if (canStart()) {
+                    area.innerHTML = `<button class="start-btn" id="startBtn">START</button>`;
+                } else {
+                    area.innerHTML = `<span class="ready-info">Both teams have players — waiting for start...</span>`;
+                }
+            } else if (curPhase === 'waiting_confirm') {
+                const initTeam = state.ready_initiator;
+                const initName = initTeam === 1 ? state.team1_name : state.team2_name;
+                const otherTeam = initTeam === 1 ? 2 : 1;
+                const otherName = otherTeam === 1 ? state.team1_name : state.team2_name;
+                area.classList.add('show');
+
+                if (myTeam > 0 && myTeam === initTeam && canStart()) {
+                    area.innerHTML = `
+                        <span class="ready-waiting-text">Waiting for ${otherName} to confirm…</span>
+                        <span class="ready-timer">${state.ready_remaining}s</span>
+                        <button class="start-btn cancel" id="cancelStartBtn">Cancel</button>
+                    `;
+                } else if (myTeam > 0 && myTeam === otherTeam && canStart()) {
+                    area.innerHTML = `
+                        <div class="ready-confirm-box">
+                            <div class="ready-confirm-text">${initName} wants to start! Are you ready?</div>
+                            <span class="ready-timer">${state.ready_remaining}s</span>
+                            <div class="ready-confirm-actions">
+                                <button class="modal-btn gold" id="readyConfirmYes">✓ Ready</button>
+                                <button class="modal-btn gray" id="readyConfirmNo">✗ Cancel</button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    area.innerHTML = `<span class="ready-info">${initName} wants to start the BP… (${state.ready_remaining}s)</span>`;
+                }
+            } else if (curPhase === 'ready_voting') {
+                area.classList.add('show');
+                area.innerHTML = buildReadyVotingHTML();
+            } else {
+                area.classList.remove('show');
+                area.innerHTML = '';
+            }
+        }
+
+        // Event delegation for readyArea buttons (stable — survives innerHTML swaps)
+        (function() {
+            const area = $('readyArea');
+            if (!area) return;
+            area.addEventListener('click', (e) => {
+                const btn = e.target.closest('button');
+                if (!btn) return;
+                if (btn.id === 'startBtn') socket.emit('request_start', { team: myTeam });
+                else if (btn.id === 'cancelStartBtn') socket.emit('confirm_start', { confirm: false });
+                else if (btn.id === 'readyConfirmYes') socket.emit('confirm_start', { confirm: true });
+                else if (btn.id === 'readyConfirmNo') socket.emit('confirm_start', { confirm: false });
+                else if (btn.id === 'rvYesBtn') socket.emit('confirm_start', { confirm: true });
+                else if (btn.id === 'rvNoBtn') socket.emit('confirm_start', { confirm: false });
+            });
+        })();
 
         // ── Admin panel ────────────────────────────────────────────────
         $('adminBtn').addEventListener('click', () => {
@@ -655,8 +897,8 @@
 
         // ── Spectate ───────────────────────────────────────────────────
         $('spectateBtn').addEventListener('click', () => {
-            if (isObserver) return;
-            socket.emit('spectate');
+            spectatorMode = !spectatorMode;
+            render();
         });
 
         // ── Init ───────────────────────────────────────────────────────
