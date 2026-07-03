@@ -297,6 +297,13 @@
             render();
         });
 
+        socket.on('bp_reset', () => {
+            myTeam = 0;
+            myRole = '';
+            myName = '';
+            render();
+        });
+
         socket.on('error', data => {
             if (data && data.message) showNotification(data.message);
         });
@@ -370,11 +377,17 @@
                 t1btn.style.display = 'inline-block';
                 t1btn.textContent = state.entry_mode === 'captain' ? '✓ Captain' : '✓ You';
                 t1btn.disabled = true;
+            } else {
+                t1btn.textContent = 'Enter Team';
+                t1btn.disabled = false;
             }
             if (myTeam === 2) {
                 t2btn.style.display = 'inline-block';
                 t2btn.textContent = state.entry_mode === 'captain' ? '✓ Captain' : '✓ You';
                 t2btn.disabled = true;
+            } else {
+                t2btn.textContent = 'Enter Team';
+                t2btn.disabled = false;
             }
 
             // Spectate button — toggles sequential reveal mode
