@@ -1,155 +1,122 @@
-# CS2 HUD Matchless — 实时 Ban & Pick 系统
+# CS2 HUD Matchless
 
-[English](README_en-US.md)
+适用于 CS2 比赛的 Broadcast HUD，专注覆盖**非比赛内**的所有展示场景——包括地图 BP、赛前等待、中场换边、地图间隙、技术暂停、赛后结果等。设计风格偏向 PGL/BLAST 等一线赛事，16:9 比例，1920×1080 及以上分辨率。
 
-CS2 比赛实时 Ban & Pick（地图 BP）HUD 系统。通过 Flask-SocketIO 提供实时多人在线 BP 流程，支持队长模式和队员投票模式，适配 BO1 / BO3 / BO5。
+> **本项目部分代码由 AI 辅助编写。**
 
-> 本项目使用 AI 辅助开发。
+![Ban & Pick](readme_snapshot/ban&pick.png)
 
----
+![Between Maps](readme_snapshot/between_maps.png)
 
-## 特性
+## 功能模块
 
-- **实时多人 BP**：双方进入后实时投票 Ban/Pick 地图
-- **两种模式**：队长模式（单人决策）和队员模式（团队投票）
-- **多图投票**：队员模式下每轮可投多张图，Top-N 得票胜出，平票随机
-- **BO1 / BO3 / BO5**：三种赛制，BO1 包含特殊选边流程
-- **HTTPS 支持**：可选 SSL 证书配置
-- **CLI 管理工具**：`bp_admin.py` 命令行管理密码、地图池、端口、SSL 等
-- **管理员面板**：网页内 Admin 菜单进行设置、启停、重置
-- **HUD 样式**：电竞风格 UI，含地图缩略图
-
----
-
-## 截图
-
-| 队员模式 | 地图投票 |
-|---|---|
-| *(请自行截图替换)* | *(请自行截图替换)* |
-
----
+| 页面 | 说明 |
+|------|------|
+| **BanPick.html** | 地图 Ban/Pick 独立页。支持 BAN / PICK / SET CT 侧，按顺序播放动画流程。 |
+| **PreMatch.html** | 赛前等待页。展示对阵双方、地图信息、Picked by，带自动倒计时（基于设定的开赛时间）。 |
+| **Halftime.html** | 中场换边页。展示双方队伍名、比分、地图信息、Picked by，含倒计时器。 |
+| **BetweenMaps.html** | 地图间隙页。展示上一张地图赛果、系列赛大分、Match History 表格、下一张地图、自动倒计时。 |
+| **Results.html** | 赛后结算页。展示冠军、系列赛大比分、Map Breakdown 表格。 |
+| **TechBreak.html** | 技术暂停页。展示暂停图标、原因说明、对阵双方和地图信息，含累计暂停计时器。 |
+| **RealtimeBP.html** | 实时多人 Ban/Pick 页。通过 WebSocket 实现队长/团队投票模式，支持 BO1/BO3/BO5 的官方 BP 流程。 |
+| **bp_server.py** | Flask-SocketIO 后端服务器，驱动 RealtimeBP 的实时 BP。支持 HTTPS、多地图池配置、密码认证。 |
+| **bp_admin.py** | CLI 管理工具，用于配置密码、地图池、BO 赛制、入场模式等。 |
 
 ## 快速开始
 
-### 环境要求
+### 静态页面
 
-- Python 3.8+
-- pip
+直接用浏览器打开任一 `.html` 文件即可。所有字段均为可编辑输入框，点击 **CONFIRM** 后会锁定为展示态。
 
-### 安装
+### 实时 BP（RealtimeBP + bp_server）
 
 ```bash
-git clone https://github.com/yourname/cs2-hud-matchless.git
-cd cs2-hud-matchless
+# 安装依赖
 pip install flask flask-socketio eventlet
-```
 
-### 启动
+# 配置密码和设置（首次运行会自动生成 bp_config.json）
+python bp_admin.py
 
-```bash
+# 启动服务器
 python bp_server.py
 ```
 
-首次运行会自动创建 `bp_config.json`，默认密码打印在控制台。
-用浏览器打开 `http://localhost:5000`。
+浏览器打开 `http://localhost:5000`，管理员、双方队长/队员分别进入后即可开始 BP。
 
-### 修改密码和设置
+## 配置说明（实时 BP 服务器）
+
+### 默认密码
+
+| 角色 | 密码 |
+|------|------|
+| Admin（管理员） | `admin` |
+| Team 1 / Team 2 | `123456` |
+
+### 修改配置
+
+**方式一：CLI 工具**
 
 ```bash
 python bp_admin.py
 ```
 
----
+交互式菜单可修改管理员密码、双方队名及密码、地图池、BO 赛制、入场模式、HTTP/HTTPS 端口、SSL 证书等所有设置。
 
-## 配置说明
+**方式二：网页端**
 
-所有配置存储在 `bp_config.json`（首次运行自动生成）。示例文件：`bp_config.example.json`。
+打开实时 BP 页面，点击左上角 **Admin** 按钮，输入管理员密码登录后可直接在浏览器中修改地图池、BO、入场模式、队名及密码。
 
-| 字段 | 说明 |
-|---|---|
-| `admin.password_hash` / `salt` | 管理员密码（SHA-256 + salt） |
-| `teams.team1/team2` | 队伍名称与密码 |
-| `ssl.enable_https` | 是否启用 HTTPS |
-| `ssl.cert_dir` | SSL 证书目录（支持相对路径） |
-| `ssl.cert_file` / `ssl.key_file` | 证书文件名与私钥文件名 |
-| `ssl.domain` | 域名（仅用于启动日志显示） |
-| `http_port` / `https_port` | HTTP / HTTPS 端口 |
-| `map_pool` | 可选地图列表 |
-| `bo` | 赛制：1 / 3 / 5 |
-| `entry_mode` | 模式：`captain`（队长）/ `team`（队员投票） |
+### 配置项说明
 
----
+| 配置项 | 说明 |
+|--------|------|
+| `admin.password_hash` / `salt` | 管理员密码的 SHA-256 哈希及盐值，通过 `bp_admin.py` 或网页 Admin 面板修改 |
+| `teams.team1` / `teams.team2` | 双方队名、密码哈希及盐值 |
+| `map_pool` | 地图池，格式为 `["de_dust2", "de_mirage", ...]`，需与 `res/` 目录下的图片文件名对应 |
+| `bo` | 系列赛制，可选值 `1` / `3` / `5`，不同 BO 对应不同的官方 BP 流程 |
+| `entry_mode` | 入场模式：`captain`（队长模式，每队仅 1 人）或 `team`（团队模式，多队员可加入并进行投票） |
+| `http_port` | HTTP 服务器端口，默认 `5000` |
+| `https_port` | HTTPS 服务器端口，默认 `8443` |
+| `ssl.enable_https` | 是否启用 HTTPS，默认 `false` |
+| `ssl.cert_dir` / `cert_file` / `key_file` | SSL 证书目录、证书文件名、私钥文件名 |
+| `ssl.domain` | 仅在控制台启动信息中显示访问地址，**无实际功能** |
 
-## 地图图片
-
-`res/` 目录下存放地图缩略图（PNG），文件名为地图 ID（如 `de_dust2.png`）。
-当前包含：
-
-- de_ancient / de_anubis / de_dust2 / de_inferno / de_mirage
-- de_nuke / de_overpass / de_train / de_vertigo / de_cache
-
-图片需自行替换为符合版权的素材。
-
----
-
-## 安全提示
-
-- **首次运行后务必修改密码**：默认密码为 `admin` / `team1` / `team2`，使用 `python bp_admin.py` 修改
-- 服务器默认绑定 `0.0.0.0`，可被局域网内其他设备访问
-- 启用 HTTPS 时需自行准备 SSL 证书（Let's Encrypt 等）
-- `bp_config.json` 包含密码哈希，已加入 `.gitignore`
-
----
-
-## 依赖库
-
-### Python (pip)
-
-| 库 | 用途 |
-|---|---|
-| [Flask](https://flask.palletsprojects.com/) | Web 框架 |
-| [Flask-SocketIO](https://flask-socketio.readthedocs.io/) | WebSocket 实时通信 |
-| [eventlet](https://eventlet.net/) | 异步网络引擎（HTTPS 需要） |
-
-### 前端 CDN (无需安装)
-
-| 库 | 用途 |
-|---|---|
-| [Socket.IO Client v4.7.5](https://socket.io/) | 客户端 WebSocket |
-| [Font Awesome 6.5.1](https://fontawesome.com/) | 图标 |
-| [Google Fonts](https://fonts.google.com/) | Inter / Rajdhani 字体 |
-
----
-
-## 文件结构
+## 目录结构
 
 ```
-cs2-hud-matchless/
-├── bp_server.py              # 主服务器
-├── bp_admin.py               # CLI 配置管理
-├── bp_config.example.json    # 配置示例
-├── bp_config.json            # 实际配置（gitignore）
-├── RealtimeBP.html           # 主界面
-├── BanPick.html              # BanPick 模式 HUD
-├── BetweenMaps.html          # 地图间过渡
-├── Halftime.html             # 半场
-├── PreMatch.html             # 赛前
-├── Results.html              # 结果
-├── TechBreak.html            # 技术暂停
-├── res/                      # 地图图片
-├── README.md                 # 本文件
-├── README_en-US.md           # 英文文档
-└── LICENSE                   # MIT 许可证
+├── BanPick.html         # 地图 BP 独立页面
+├── PreMatch.html        # 赛前页面
+├── Halftime.html        # 中场换边页面
+├── BetweenMaps.html     # 地图间隙页面
+├── Results.html         # 赛后结果页面
+├── TechBreak.html       # 技术暂停页面
+├── RealtimeBP.html      # 实时多人 BP 页面
+├── bp_server.py         # 实时 BP 后端服务器
+├── bp_admin.py          # BP 配置管理 CLI
+├── bp_config.json       # BP 服务器配置（自动生成）
+├── bp_config.example.json # 配置文件样例
+├── res/                 # 地图图片等静态资源
+└── readme_snapshot/     # README 截图
 ```
 
----
+## 设计特征
 
-## AI 辅助声明
+- 深色科幻风 UI，蓝橙双色区分 CT/T 阵营
+- 响应式 16:9 布局，适配 1080p 及以上分辨率
+- Rajdhani + Inter 字体组合
+- 所有页面采用统一的 Design System（CSS 变量）
+- 编辑-确认两步工作流：编辑态一键切为展示态
 
-本项目在开发过程中使用了 AI 编程助手（OpenCode + DeepSeek-V4 Pro）进行代码生成、重构和调试。所有 AI 生成的代码经过人工审阅和测试。
+## 自定义
 
----
+- **队名**：各页面的输入框均支持直接修改队名
+- **地图名称、比分**：文本和数字输入框均可自由填写
+- **BO 赛制**：可在 PreMatch/BetweenMaps/Results 中输入自定义系列赛格式
+- **倒计时**：PreMatch 和 BetweenMaps 支持设置目标时间后自动计算剩余时间
 
-## 许可证
+## 版权说明
 
-[MIT](LICENSE)
+- 地图图片来源于 [Liquipedia](https://liquipedia.net/)
+- 图标使用 [Font Awesome](https://fontawesome.com/) (v6.5.1)
+- 本项目使用 AI 辅助开发
+- 开源协议：[MIT License](LICENSE)
