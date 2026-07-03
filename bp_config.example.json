@@ -1,0 +1,30 @@
+{
+    "_version": 2,
+    "admin": {
+        "password_hash": "ad76f0811b14eb3692be264611b55998d818fea463a1836d09194fcd2f168816",
+        "salt": "73abf7c4803529d63db46cf5a0b5a243"
+    },
+    "teams": {
+        "team1": {
+            "name": "Team Liquid",
+            "password_hash": "eab3bd62f8505691da696990f5d26e04ea71f2099a4d550b4b8da4b8b5a29a6a",
+            "salt": "1b08436f9e984b069039aa7310a60379"
+        },
+        "team2": {
+            "name": "NAVI",
+            "password_hash": "665bd00f0c1bf603c2e7f915cb72745f3dd0b109c6a70bbb2945985349553510",
+            "salt": "0ceec89c32754d33736add3c8f576784"
+        }
+    },
+    "map_pool": [
+        "de_dust2",
+        "de_mirage",
+        "de_inferno",
+        "de_anubis",
+        "de_cache",
+        "de_nuke",
+        "de_ancient"
+    ],
+    "bo": 3,
+    "entry_mode": "team"
+}
