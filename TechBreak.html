@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root {
             --bg-primary: #070c1a;
@@ -304,7 +305,7 @@
         <div class="content">
 
             <!-- Pause Icon -->
-            <div class="pause-icon">⏸</div>
+            <div class="pause-icon"><i class="fa-solid fa-pause"></i></div>
 
             <!-- Title -->
             <div class="title">TECHNICAL <span class="accent">BREAK</span></div>
@@ -342,13 +343,13 @@
             <div class="timer-section">
                 <span class="timer-label">Pause Duration</span>
                 <div id="timer-display" class="timer-display">00:00</div>
-                <button id="timer-start-btn" class="timer-btn play">▶ Start</button>
-                <button id="timer-pause-btn" class="timer-btn pause-btn hidden">⏸ Pause</button>
+                <button id="timer-start-btn" class="timer-btn play"><i class="fa-solid fa-play"></i> Start</button>
+                <button id="timer-pause-btn" class="timer-btn pause-btn hidden"><i class="fa-solid fa-pause"></i> Pause</button>
                 <button id="timer-reset-btn" class="timer-btn reset-btn hidden">Reset</button>
             </div>
 
             <!-- Confirm -->
-            <button id="confirm-btn" class="confirm-btn">✦ CONFIRM</button>
+            <button id="confirm-btn" class="confirm-btn"><i class="fa-solid fa-star"></i> CONFIRM</button>
 
         </div>
     </div>
@@ -409,7 +410,7 @@
                 updateDisplay();
                 timerDisplay.classList.remove('running', 'paused');
                 startBtn.classList.remove('hidden');
-                startBtn.textContent = '▶ Start';
+                startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
                 pauseBtn.classList.add('hidden');
                 resetBtn.classList.add('hidden');
             }

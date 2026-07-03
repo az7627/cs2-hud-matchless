@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root {
             --bg-primary: #070c1a;
@@ -519,7 +520,7 @@
                     <span><span class="num t1-color" id="t1PickCount">0</span> picked</span>
                     <span><span class="num t2-color" id="t2PickCount">0</span> picked</span>
                 </div>
-                <button class="play-btn" id="playBtn" disabled>▶ PLAY SEQUENCE</button>
+                <button class="play-btn" id="playBtn" disabled><i class="fa-solid fa-play"></i> PLAY SEQUENCE</button>
             </div>
 
         </div>
@@ -685,7 +686,7 @@
                         // Change side button
                         const sb = document.createElement('button');
                         sb.className = 'action-btn pick-btn';
-                        sb.textContent = '⇄ CT';
+                        sb.innerHTML = '<i class="fa-solid fa-right-left"></i> CT';
                         sb.style.fontSize = 'clamp(0.42rem, 0.5vw, 0.62rem)';
                         sb.addEventListener('click', e => { e.stopPropagation(); doSide(mapId); });
                         ac.appendChild(sb);
