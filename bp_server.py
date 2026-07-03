@@ -23,17 +23,28 @@ def make_salt():
 def hash_password(password, salt):
     return hashlib.sha256((password + salt).encode()).hexdigest()
 
-CONFIG_VERSION = 2
+CONFIG_VERSION = 3
 
 def make_default_config():
-    s = make_salt()
+    sa = make_salt()
+    s1 = make_salt()
+    s2 = make_salt()
     return {
         '_version': CONFIG_VERSION,
-        'admin': {'password_hash': hash_password('admin', s), 'salt': s},
+        'admin': {'password_hash': hash_password('admin', sa), 'salt': sa},
         'teams': {
-            'team1': {'name': 'Team 1', 'password_hash': hash_password('team1', s), 'salt': s},
-            'team2': {'name': 'Team 2', 'password_hash': hash_password('team2', s), 'salt': s},
+            'team1': {'name': 'Team 1', 'password_hash': hash_password('team1', s1), 'salt': s1},
+            'team2': {'name': 'Team 2', 'password_hash': hash_password('team2', s2), 'salt': s2},
         },
+        'ssl': {
+            'enable_https': False,
+            'cert_dir': '/path/to/cert',
+            'cert_file': 'your_domain.pem',
+            'key_file': 'your_domain.key',
+            'domain': 'your_domain.com',
+        },
+        'http_port': 5000,
+        'https_port': 8443,
         'map_pool': ['de_dust2','de_mirage','de_inferno','de_anubis','de_overpass','de_nuke','de_ancient'],
         'bo': 3,
         'entry_mode': 'captain',
@@ -53,7 +64,7 @@ def ensure_config():
         if existing.get('_version') != CONFIG_VERSION:
             # Merge existing settings into new defaults
             defaults = make_default_config()
-            for key in ('admin', 'teams', 'map_pool', 'bo', 'entry_mode'):
+            for key in ('admin', 'teams', 'ssl', 'http_port', 'https_port', 'map_pool', 'bo', 'entry_mode'):
                 if key in existing:
                     defaults[key] = existing[key]
             defaults['_version'] = CONFIG_VERSION
@@ -235,16 +246,31 @@ class BPState:
 
     def _load_step(self):
         if self.step_index >= len(self.steps):
+            # BO1: after all bans, remaining map gets side pick by second mover
+            if self.bo == 1 and len(self.available) == 1:
+                decider_map = self.available[0]
+                self.available.remove(decider_map)
+                self.picked.append({'map_id': decider_map, 'by': 0, 'ct_team': None})
+                self.phase = 'side_pick'
+                self.waiting_side_for = decider_map
+                self.current_acting = self._acting_order[1]
+                self.current_action = 'side'
+                self.remaining_in_step = 0
+                self.votes = {}
+                self.vote_active = False
+                if self.entry_mode == 'team':
+                    self.start_vote_timer()
+                return
             # All steps done
-            if len(self.available) == 1:
-                # Decider (Knife) — complete
+            if len(self.available) <= 1:
                 self.phase = 'complete'
-                self.history.append({
-                    'action': 'decider',
-                    'map_id': self.available[0],
-                    'team': 0,
-                    'detail': f'{self.available[0]} — Decider'
-                })
+                if len(self.available) == 1:
+                    self.history.append({
+                        'action': 'decider',
+                        'map_id': self.available[0],
+                        'team': 0,
+                        'detail': f'{self.available[0]} — Decider'
+                    })
             return
 
         action, raw_team, count, raw_side = self.steps[self.step_index]
@@ -262,7 +288,8 @@ class BPState:
             self.start_vote_timer()
 
     def execute_action(self, map_id, sid):
-        """Called when a player/captain performs a ban or pick."""
+        """Called when a player/captain performs a ban or pick.
+        Returns True on success, or an error string on failure."""
         if self.phase == 'side_pick':
             if self.waiting_side_for and map_id in ('ct', 't'):
                 # map_id='ct' → my team plays CT; 't' → my team plays T
@@ -270,21 +297,33 @@ class BPState:
                 ct_team = choosing_team if map_id == 'ct' else (3 - choosing_team)
                 self._apply_side(ct_team)
                 return True
-            return False
+            return 'Invalid side choice'
 
         if self.phase != 'bp':
-            return False
+            return 'BP not active'
 
         team = self.current_acting
         if not self.can_act(sid, team):
-            return False
+            return 'Not your turn'
 
         if map_id not in self.available:
-            return False
+            return 'Map not available'
 
         if self.entry_mode == 'team' and self.vote_active:
-            # Record vote
-            self.votes[sid] = {'map_id': map_id, 'action': self.current_action, 'team': team}
+            count = self.remaining_in_step
+            if count == 1:
+                # Single vote — replace
+                self.votes[sid] = {'map_ids': [map_id], 'action': self.current_action, 'team': team}
+            else:
+                # Multi vote — toggle
+                voter = self.votes.get(sid, {'map_ids': [], 'action': self.current_action, 'team': team})
+                if map_id in voter['map_ids']:
+                    voter['map_ids'].remove(map_id)
+                else:
+                    if len(voter['map_ids']) >= count:
+                        return f'Maximum {count} map(s) allowed'
+                    voter['map_ids'].append(map_id)
+                self.votes[sid] = voter
             return True
 
         # Captain mode — immediate action
@@ -345,6 +384,51 @@ class BPState:
 
         return True
 
+    def _apply_multiple(self, map_ids, team):
+        """Apply multiple bans/picks in one batch (team-mode multi-vote)."""
+        action = self.current_action
+        for map_id in map_ids:
+            self.available.remove(map_id)
+            if action == 'ban':
+                self.banned.append({'map_id': map_id, 'by': team})
+                self.history.append({
+                    'action': 'ban', 'map_id': map_id,
+                    'team': team,
+                    'detail': f'{self.get_team_name(team)} banned {map_id}'
+                })
+            elif action == 'pick':
+                self.picked.append({'map_id': map_id, 'by': team, 'ct_team': None})
+                self.history.append({
+                    'action': 'pick', 'map_id': map_id,
+                    'team': team,
+                    'detail': f'{self.get_team_name(team)} picked {map_id}'
+                })
+
+        self.remaining_in_step -= len(map_ids)
+
+        if self.remaining_in_step <= 0:
+            if action == 'pick' and self.side_picker > 0:
+                last_map = map_ids[-1]
+                self.phase = 'side_pick'
+                self.waiting_side_for = last_map
+                self.current_acting = self.side_picker
+                self.current_action = 'side'
+                if self.entry_mode == 'team':
+                    self.start_vote_timer()
+                return
+            self.step_index += 1
+            self._load_step()
+
+        if len(self.available) <= 1 and self.phase == 'bp':
+            self.phase = 'complete'
+            if len(self.available) == 1:
+                self.history.append({
+                    'action': 'decider',
+                    'map_id': self.available[0],
+                    'team': 0,
+                    'detail': f'{self.available[0]} — Decider'
+                })
+
     def _apply_side(self, ct_team):
         """ct_team: display team that plays CT (1 or 2)."""
         if not self.waiting_side_for:
@@ -385,79 +469,104 @@ class BPState:
         ct_team = team if side_team == 1 else (3 - team)
 
         if self.entry_mode == 'team' and self.vote_active:
-            self.votes[sid] = {'map_id': 'ct' if side_team == 1 else 't', 'action': 'side', 'team': team}
+            self.votes[sid] = {'map_ids': ['ct' if side_team == 1 else 't'], 'action': 'side', 'team': team}
             return True
 
         self._apply_side(ct_team)
         return True
 
+    @staticmethod
+    def _top_n_with_tiebreak(counts, n):
+        """Select top n items from a Counter, randomizing ties at the boundary."""
+        items = sorted(counts.items(), key=lambda x: -x[1])
+        result = []
+        i = 0
+        while i < len(items) and len(result) < n:
+            # Collect all items with this count
+            j = i
+            while j < len(items) and items[j][1] == items[i][1]:
+                j += 1
+            tie_group = [items[k][0] for k in range(i, j)]
+            remaining = n - len(result)
+            if len(tie_group) <= remaining:
+                result.extend(tie_group)
+            else:
+                result.extend(random.sample(tie_group, remaining))
+            i = j
+        return result
+
     def finalize_votes(self):
         """Called when vote timer expires — tally votes and execute."""
         if self.phase == 'bp' and self.current_action in ('ban', 'pick'):
-            # Tally votes for ban/pick
             team_votes = [v for v in self.votes.values() if v['team'] == self.current_acting]
-            if not team_votes or not any(v['action'] == self.current_action for v in team_votes):
-                # No votes cast — random fallback to avoid BP deadlock
+            need = self.remaining_in_step
+            # Collect all map votes from all voters
+            all_map_votes = []
+            for v in team_votes:
+                for mid in v.get('map_ids', []):
+                    if mid in self.available:
+                        all_map_votes.append(mid)
+            if not all_map_votes:
+                # No votes — random fallback
                 avail = [m for m in self.available]
                 if avail:
-                    chosen = random.choice(avail)
-                    self._apply_action(chosen, self.current_acting)
+                    chosen = random.sample(avail, min(need, len(avail)))
+                    self._apply_multiple(chosen, self.current_acting)
                 else:
                     self.step_index += 1
                     self._load_step()
                 self.votes = {}
-                # vote_active already False from countdown; _apply_action may restart it
                 return
-            counts = Counter(v['map_id'] for v in team_votes if v['action'] == self.current_action)
-            if not counts:
-                self.votes = {}
-                self.vote_active = False
-                return
-            max_count = max(counts.values())
-            top = [m for m, c in counts.items() if c == max_count]
-            chosen = random.choice(top)
-            self._apply_action(chosen, self.current_acting)
-            # Clear vote state only when BP is truly done (complete) or
-            # we stayed in bp but no new timer was started.
-            # Never clear if we transitioned to side_pick (new timer).
-            if self.phase == 'complete' or (self.phase == 'bp' and not self.vote_active):
-                self.votes = {}
-                self.vote_active = False
+            counts = Counter(all_map_votes)
+            chosen = self._top_n_with_tiebreak(counts, min(need, len(self.available)))
+            self._apply_multiple(chosen, self.current_acting)
+            self.votes = {}
             return
 
         if self.phase == 'side_pick':
             team_votes = [v for v in self.votes.values() if v['team'] == self.current_acting]
-            if not team_votes or not any(v['action'] == 'side' for v in team_votes):
+            all_side_votes = []
+            for v in team_votes:
+                all_side_votes.extend(v.get('map_ids', []))
+            if not all_side_votes:
                 # No votes — random fallback
                 ct_team = random.choice([1, 2])
                 self._apply_side(ct_team)
+                self.votes = {}
                 return
-            counts = Counter(v['map_id'] for v in team_votes if v['action'] == 'side')
-            if not counts:
-                self._apply_side(1)
-                return
+            counts = Counter(all_side_votes)
             max_count = max(counts.values())
             top = [m for m, c in counts.items() if c == max_count]
             chosen = random.choice(top)  # 'ct' or 't'
             choosing_team = self.current_acting
             ct_team = choosing_team if chosen == 'ct' else (3 - choosing_team)
             self._apply_side(ct_team)
-            # _apply_side transitions to bp & may start new timer via _load_step
+            self.votes = {}
             return
 
         self.votes = {}
         self.vote_active = False
 
     def start_vote_timer(self):
-        """Start a 10-second voting window (team mode only)."""
+        """Start a voting window with dynamic duration (team mode only)."""
         if self.entry_mode != 'team':
             return
         self.votes = {}
         self.vote_active = True
-        self.vote_remaining = 10
+        if self.phase == 'side_pick':
+            self.vote_remaining = 5
+        else:
+            c = self.remaining_in_step
+            if c == 1:
+                self.vote_remaining = 10
+            elif c == 2:
+                self.vote_remaining = 15
+            else:
+                self.vote_remaining = 20
+        duration = self.vote_remaining
 
         def countdown():
-            for i in range(10, 0, -1):
+            for i in range(duration, 0, -1):
                 self.vote_remaining = i
                 broadcast()
                 if not self.vote_active:
@@ -466,7 +575,7 @@ class BPState:
             if self.vote_active:
                 self.vote_active = False
                 self.finalize_votes()
-                broadcast()  # Always push result after finalize
+                broadcast()
 
         socketio.start_background_task(countdown)
 
@@ -513,18 +622,23 @@ def on_admin_update(data):
 
     if 'map_pool' in updates:
         config['map_pool'] = updates['map_pool']
+        bp.map_pool = list(updates['map_pool'])
         changed = True
     if 'bo' in updates:
         config['bo'] = int(updates['bo'])
+        bp.bo = int(updates['bo'])
         changed = True
     if 'entry_mode' in updates:
         config['entry_mode'] = updates['entry_mode']
+        bp.entry_mode = updates['entry_mode']
         changed = True
     if 'team1_name' in updates:
         config['teams']['team1']['name'] = updates['team1_name']
+        bp.team1_name = updates['team1_name']
         changed = True
     if 'team2_name' in updates:
         config['teams']['team2']['name'] = updates['team2_name']
+        bp.team2_name = updates['team2_name']
         changed = True
     if 'admin_password' in updates:
         new_pwd = updates['admin_password']
@@ -635,11 +749,13 @@ def on_action(data):
     else:
         success = bp.execute_action(map_id, sid)
 
-    if success:
+    if success is True:
         if bp.entry_mode == 'team' and bp.vote_active:
-            broadcast()  # Show updated votes
+            broadcast()
         else:
             broadcast()
+    elif isinstance(success, str):
+        emit('error', {'message': success})
     else:
         emit('error', {'message': 'Action not allowed'})
 
@@ -848,22 +964,32 @@ def serve_res(filename):
 if __name__ == '__main__':
     from flask import request
 
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    # cert is at C:\Users\a233d\Documents\cert (two levels up from git\cs2-hud-matchless)
-    CERT_DIR = os.path.join(os.path.dirname(os.path.dirname(BASE_DIR)), 'cert')
-    cert_file = os.path.join(CERT_DIR, 'az7627.top.pem')
-    key_file = os.path.join(CERT_DIR, 'az7627.top.key')
+    cfg = load_config()
+    ssl_cfg = cfg.get('ssl', {})
+    http_port = cfg.get('http_port', 5000)
+    https_port = cfg.get('https_port', 8443)
+    enable_https = ssl_cfg.get('enable_https', False)
+    cert_dir = ssl_cfg.get('cert_dir', '/path/to/cert')
+    cert_file = ssl_cfg.get('cert_file', 'cert.pem')
+    key_file = ssl_cfg.get('key_file', 'cert.key')
+    domain = ssl_cfg.get('domain', 'localhost')
+
+    # If cert_dir is relative, resolve relative to the script directory
+    if not os.path.isabs(cert_dir):
+        cert_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), cert_dir)
+    cert_path = os.path.join(cert_dir, cert_file)
+    key_path = os.path.join(cert_dir, key_file)
 
     print("═══ CS2 Real-time BP Server ═══")
     print(f"Config: {CONFIG_PATH}")
-    print(f"BO{config['bo']} | Mode: {config['entry_mode']}")
-    print(f"Teams: {config['teams']['team1']['name']} vs {config['teams']['team2']['name']}")
-    print(f"Maps: {', '.join(config['map_pool'])}")
+    print(f"BO{cfg['bo']} | Mode: {cfg['entry_mode']}")
+    print(f"Teams: {cfg['teams']['team1']['name']} vs {cfg['teams']['team2']['name']}")
+    print(f"Maps: {', '.join(cfg['map_pool'])}")
     print()
-    if os.path.exists(cert_file) and os.path.exists(key_file):
+    if enable_https and os.path.exists(cert_path) and os.path.exists(key_path):
         import eventlet
         import socket
-        print(f"Starting HTTPS server at https://az7627.top:8443")
+        print(f"Starting HTTPS server at https://{domain}:{https_port}")
         print("Press Ctrl+C to stop.")
         print()
         # Dual-stack IPv4+IPv6 — create socket manually to bypass
@@ -872,20 +998,22 @@ if __name__ == '__main__':
             sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.bind(('', 8443))
+            sock.bind(('', https_port))
             sock.listen(128)
             ssl_listener = eventlet.wrap_ssl(
-                sock, certfile=cert_file, keyfile=key_file, server_side=True)
-            print("Listening on [::]:8443 (dual-stack IPv4+IPv6)")
+                sock, certfile=cert_path, keyfile=key_path, server_side=True)
+            print(f"Listening on [::]:{https_port} (dual-stack IPv4+IPv6)")
         except Exception as e:
             print(f"Dual-stack failed ({e}), IPv4 only")
-            listener = eventlet.listen(('0.0.0.0', 8443))
+            listener = eventlet.listen(('0.0.0.0', https_port))
             ssl_listener = eventlet.wrap_ssl(
-                listener, certfile=cert_file, keyfile=key_file, server_side=True)
-            print("Listening on 0.0.0.0:8443 (IPv4 only)")
+                listener, certfile=cert_path, keyfile=key_path, server_side=True)
+            print(f"Listening on 0.0.0.0:{https_port} (IPv4 only)")
         eventlet.wsgi.server(ssl_listener, app)
     else:
-        print("Cert not found, starting HTTP at http://localhost:5000")
+        if enable_https:
+            print(f"Cert not found at {cert_path} or {key_path}, falling back to HTTP")
+        print(f"Starting HTTP server at http://localhost:{http_port}")
         print("Press Ctrl+C to stop.")
         print()
-        socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
+        socketio.run(app, host='0.0.0.0', port=http_port, debug=False, allow_unsafe_werkzeug=True)
