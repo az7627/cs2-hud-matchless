@@ -133,9 +133,38 @@ class BPState:
         self.remaining_in_step = 0
         self.side_picker = 0
         self.waiting_side_for = None  # map_id waiting for side pick
+        # Step order: [display_team_for_role_1, display_team_for_role_2]
+        # Randomised in start_bp() so first-mover isn't always team 1.
+        self._acting_order = [1, 2]
+        # Captain-ready start flow
+        self.ready_phase = 'none'    # none | awaiting_start | waiting_confirm | ready_voting
+        self.ready_initiator = 0
+        self.ready_remaining = 0
+        self.ready_confirmations = {}  # {sid: True/False/None} for team ready voting
 
     def get_team_name(self, team):
         return self.team1_name if team == 1 else self.team2_name
+
+    def get_player_team(self, sid):
+        """Return team (1|2) if sid is a registered player (any mode), else None."""
+        for t, players in ((1, self.team1_players), (2, self.team2_players)):
+            if any(p['sid'] == sid for p in players):
+                return t
+        return None
+
+    def get_captain_team(self, sid):
+        """Return team (1|2) if sid is a registered captain, else None."""
+        for t in (1, 2):
+            if self.captain_sid[t] == sid:
+                return t
+        return None
+
+    def _get_player_name(self, sid):
+        """Resolve a player's display name from their SID."""
+        for p in self.team1_players + self.team2_players:
+            if p['sid'] == sid:
+                return p['name']
+        return '?'
 
     def can_act(self, sid, team):
         """Check if a socket can perform actions for a team."""
@@ -148,6 +177,11 @@ class BPState:
 
     def get_public_state(self):
         """Return state safe for all clients."""
+        # Enrich votes with voter names
+        enriched_votes = {}
+        for sid, v in self.votes.items():
+            enriched_votes[sid] = dict(v)
+            enriched_votes[sid]['voter_name'] = self._get_player_name(sid)
         return {
             'phase': self.phase,
             'bo': self.bo,
@@ -168,15 +202,33 @@ class BPState:
             'history': list(self.history),
             'vote_active': self.vote_active,
             'vote_remaining': self.vote_remaining,
-            'votes': dict(self.votes),
+            'votes': enriched_votes,
             'team1_player_count': len(self.team1_players),
             'team2_player_count': len(self.team2_players),
-            'team1_players': [{'name': p['name']} for p in self.team1_players],
-            'team2_players': [{'name': p['name']} for p in self.team2_players],
+            'ready_phase': self.ready_phase,
+            'ready_initiator': self.ready_initiator,
+            'ready_remaining': self.ready_remaining,
+            'ready_confirmations': dict(self.ready_confirmations),
+            'team1_players': [{'name': p['name'], 'sid': p['sid']} for p in self.team1_players],
+            'team2_players': [{'name': p['name'], 'sid': p['sid']} for p in self.team2_players],
         }
 
     def start_bp(self):
-        """Begin the BP sequence."""
+        """Begin the BP sequence — reloads config, preserves players, random first."""
+        saved = {
+            'team1_players': list(self.team1_players),
+            'team2_players': list(self.team2_players),
+            'captain_sid': dict(self.captain_sid),
+        }
+        self.reset()
+        self.team1_players = saved['team1_players']
+        self.team2_players = saved['team2_players']
+        self.captain_sid = saved['captain_sid']
+        # Randomise: _acting_order maps step-role (1=first, 2=second)
+        # to display-team (1=left, 2=right).  Players' myTeam never changes.
+        self._acting_order = [1, 2]
+        if random.random() < 0.5:
+            self._acting_order = [2, 1]
         self.phase = 'bp'
         self.step_index = 0
         self._load_step()
@@ -195,11 +247,12 @@ class BPState:
                 })
             return
 
-        action, team, count, side_picker = self.steps[self.step_index]
-        self.current_acting = team
+        action, raw_team, count, raw_side = self.steps[self.step_index]
+        # Map step roles (1=first, 2=second) to display teams via _acting_order
+        self.current_acting = self._acting_order[raw_team - 1]
         self.current_action = action
         self.remaining_in_step = count
-        self.side_picker = side_picker
+        self.side_picker = self._acting_order[raw_side - 1] if raw_side > 0 else 0
         self.waiting_side_for = None
         self.votes = {}
         self.vote_active = False
@@ -211,11 +264,11 @@ class BPState:
     def execute_action(self, map_id, sid):
         """Called when a player/captain performs a ban or pick."""
         if self.phase == 'side_pick':
-            # Handle side choice
             if self.waiting_side_for and map_id in ('ct', 't'):
-                # map_id is actually 'ct' or 't' indicating side choice
-                side_team = 1 if map_id == 'ct' else 2
-                self._apply_side(side_team)
+                # map_id='ct' → my team plays CT; 't' → my team plays T
+                choosing_team = self.current_acting
+                ct_team = choosing_team if map_id == 'ct' else (3 - choosing_team)
+                self._apply_side(ct_team)
                 return True
             return False
 
@@ -266,14 +319,18 @@ class BPState:
                 self.waiting_side_for = map_id
                 self.current_acting = self.side_picker
                 self.current_action = 'side'
+                # Start vote timer in team mode
+                if self.entry_mode == 'team':
+                    self.start_vote_timer()
                 return True
 
             # Move to next step
             self.step_index += 1
             self._load_step()
         else:
-            # More maps to ban/pick in this step
-            pass
+            # More maps to ban/pick in this step — start new vote timer (team mode)
+            if self.entry_mode == 'team':
+                self.start_vote_timer()
 
         # Check if BP is complete
         if len(self.available) <= 1 and self.phase == 'bp':
@@ -288,23 +345,23 @@ class BPState:
 
         return True
 
-    def _apply_side(self, side_team):
-        """side_team = 1 for CT, 2 for T"""
+    def _apply_side(self, ct_team):
+        """ct_team: display team that plays CT (1 or 2)."""
         if not self.waiting_side_for:
             return
         map_id = self.waiting_side_for
-        # Find the picked map entry
         for p in self.picked:
             if p['map_id'] == map_id:
-                p['ct_team'] = side_team
+                p['ct_team'] = ct_team
                 break
-        picker = self.get_team_name(3 - self.current_acting)  # team that picked
-        chooser = self.get_team_name(self.current_acting)     # team that chose side
+        ct_name = self.get_team_name(ct_team)
+        t_name = self.get_team_name(3 - ct_team)
+        chooser = self.get_team_name(self.current_acting)
         self.history.append({
             'action': 'side',
             'map_id': map_id,
-            'team': side_team,
-            'detail': f'{chooser} chose {side_team} as CT on {map_id} (picked by {picker})'
+            'team': ct_team,
+            'detail': f'{chooser} chose {ct_name} CT / {t_name} T on {map_id}'
         })
         self.waiting_side_for = None
         self.phase = 'bp'
@@ -315,7 +372,7 @@ class BPState:
             self._load_step()
 
     def side_choice(self, side_team, sid):
-        """Handle side choice: side_team=1 means CT, 2 means T."""
+        """Handle side choice: side_team=1 → my team CT; 2 → my team T."""
         if self.phase != 'side_pick':
             return False
         team = self.current_acting
@@ -324,42 +381,69 @@ class BPState:
         if self.waiting_side_for is None:
             return False
 
+        # Convert symbolic (1=my-team-CT, 2=my-team-T) to actual ct_team
+        ct_team = team if side_team == 1 else (3 - team)
+
         if self.entry_mode == 'team' and self.vote_active:
             self.votes[sid] = {'map_id': 'ct' if side_team == 1 else 't', 'action': 'side', 'team': team}
             return True
 
-        self._apply_side(side_team)
+        self._apply_side(ct_team)
         return True
 
     def finalize_votes(self):
         """Called when vote timer expires — tally votes and execute."""
         if self.phase == 'bp' and self.current_action in ('ban', 'pick'):
             # Tally votes for ban/pick
-            team_votes = {v for v in self.votes.values() if v['team'] == self.current_acting}
-            if not team_votes:
+            team_votes = [v for v in self.votes.values() if v['team'] == self.current_acting]
+            if not team_votes or not any(v['action'] == self.current_action for v in team_votes):
+                # No votes cast — random fallback to avoid BP deadlock
+                avail = [m for m in self.available]
+                if avail:
+                    chosen = random.choice(avail)
+                    self._apply_action(chosen, self.current_acting)
+                else:
+                    self.step_index += 1
+                    self._load_step()
+                self.votes = {}
+                # vote_active already False from countdown; _apply_action may restart it
                 return
-            # Count map_id occurrences
             counts = Counter(v['map_id'] for v in team_votes if v['action'] == self.current_action)
             if not counts:
+                self.votes = {}
+                self.vote_active = False
                 return
             max_count = max(counts.values())
             top = [m for m, c in counts.items() if c == max_count]
             chosen = random.choice(top)
             self._apply_action(chosen, self.current_acting)
+            # Clear vote state only when BP is truly done (complete) or
+            # we stayed in bp but no new timer was started.
+            # Never clear if we transitioned to side_pick (new timer).
+            if self.phase == 'complete' or (self.phase == 'bp' and not self.vote_active):
+                self.votes = {}
+                self.vote_active = False
+            return
 
-        elif self.phase == 'side_pick':
-            team_votes = {v for v in self.votes.values() if v['team'] == self.current_acting}
-            if not team_votes:
+        if self.phase == 'side_pick':
+            team_votes = [v for v in self.votes.values() if v['team'] == self.current_acting]
+            if not team_votes or not any(v['action'] == 'side' for v in team_votes):
+                # No votes — random fallback
+                ct_team = random.choice([1, 2])
+                self._apply_side(ct_team)
                 return
-            from collections import Counter
             counts = Counter(v['map_id'] for v in team_votes if v['action'] == 'side')
             if not counts:
+                self._apply_side(1)
                 return
             max_count = max(counts.values())
             top = [m for m, c in counts.items() if c == max_count]
             chosen = random.choice(top)  # 'ct' or 't'
-            side_team = 1 if chosen == 'ct' else 2
-            self._apply_side(side_team)
+            choosing_team = self.current_acting
+            ct_team = choosing_team if chosen == 'ct' else (3 - choosing_team)
+            self._apply_side(ct_team)
+            # _apply_side transitions to bp & may start new timer via _load_step
+            return
 
         self.votes = {}
         self.vote_active = False
@@ -375,15 +459,16 @@ class BPState:
         def countdown():
             for i in range(10, 0, -1):
                 self.vote_remaining = i
+                broadcast()
                 if not self.vote_active:
                     return
-                time.sleep(1)
+                socketio.sleep(1)
             if self.vote_active:
                 self.vote_active = False
                 self.finalize_votes()
+                broadcast()  # Always push result after finalize
 
-        self.vote_timer = threading.Thread(target=countdown, daemon=True)
-        self.vote_timer.start()
+        socketio.start_background_task(countdown)
 
 
 # ── Flask App ────────────────────────────────────────────────────────────
@@ -401,6 +486,7 @@ def broadcast():
 # ── Socket.IO Events ─────────────────────────────────────────────────────
 @socketio.on('connect')
 def on_connect():
+    emit('sid', request.sid)
     emit('state_update', bp.get_public_state())
 
 @socketio.on('admin_login')
@@ -496,10 +582,7 @@ def on_enter_team(data):
         players.append({'sid': sid, 'name': player_name or f'Captain {team}'})
         emit('team_entry_result', {'success': True, 'team': team, 'role': 'captain'})
     else:
-        # Team mode — anyone can join
-        if bp.phase != 'idle':
-            emit('error', {'message': 'BP already in progress'})
-            return
+        # Team mode — allow joining even during BP (players may reconnect)
         if not player_name:
             emit('error', {'message': 'Name is required in team mode'})
             return
@@ -509,6 +592,16 @@ def on_enter_team(data):
             return
         players.append({'sid': sid, 'name': player_name})
         emit('team_entry_result', {'success': True, 'team': team, 'role': 'player', 'name': player_name})
+        # If ready voting is active, add newcomer to the confirmation pool
+        if bp.ready_phase == 'ready_voting':
+            bp.ready_confirmations[sid] = None
+
+    # Check if both teams have at least one player -> ready to start
+    if bp.phase == 'idle':
+        if bp.entry_mode == 'captain' and bp.captain_sid[1] and bp.captain_sid[2]:
+            bp.ready_phase = 'awaiting_start'
+        elif bp.entry_mode == 'team' and len(bp.team1_players) > 0 and len(bp.team2_players) > 0:
+            bp.ready_phase = 'awaiting_start'
 
     broadcast()
 
@@ -529,8 +622,7 @@ def on_start_bp(data):
         emit('error', {'message': 'BP already started'})
         return
 
-    bp.reset()  # Reload config
-    bp.start_bp()
+    bp.start_bp()  # reloads config, preserves player state
     broadcast()
 
 @socketio.on('action')
@@ -561,6 +653,165 @@ def on_reset_state(data):
     bp.reset()
     broadcast()
 
+@socketio.on('request_start')
+def on_request_start(data):
+    """A player/captain requests to start the BP — prompts the other team to confirm."""
+    sid = request.sid
+    team = data.get('team', 0)
+
+    if team not in (1, 2):
+        emit('error', {'message': 'Invalid team'})
+        return
+    # Verify user belongs to the claimed team (captain mode or team mode)
+    if bp.entry_mode == 'captain':
+        if bp.captain_sid[team] != sid:
+            emit('error', {'message': 'You are not the captain of this team'})
+            return
+    else:
+        players = bp.team1_players if team == 1 else bp.team2_players
+        if not any(p['sid'] == sid for p in players):
+            emit('error', {'message': 'You are not on this team'})
+            return
+    if bp.ready_phase != 'awaiting_start':
+        emit('error', {'message': 'Cannot request start right now'})
+        return
+    if bp.phase != 'idle':
+        emit('error', {'message': 'BP already started'})
+        return
+
+    if bp.entry_mode == 'team':
+        # ── Team mode: ready voting ──
+        bp.ready_phase = 'ready_voting'
+        bp.ready_initiator = team
+        bp.ready_remaining = 30
+        bp.ready_confirmations = {}
+        for t in (1, 2):
+            players = bp.team1_players if t == 1 else bp.team2_players
+            for p in players:
+                bp.ready_confirmations[p['sid']] = True if (t == team and p['sid'] == sid) else None
+        broadcast()
+
+        def r_countdown():
+            for i in range(30, 0, -1):
+                bp.ready_remaining = i
+                if bp.ready_phase != 'ready_voting':
+                    return
+                broadcast()
+                socketio.sleep(1)
+            if bp.ready_phase == 'ready_voting':
+                bp.ready_phase = 'awaiting_start'
+                bp.ready_initiator = 0
+                bp.ready_remaining = 0
+                bp.ready_confirmations = {}
+                broadcast()
+        socketio.start_background_task(r_countdown)
+        return
+
+    # ── Captain mode: simple confirm flow ──
+    bp.ready_phase = 'waiting_confirm'
+    bp.ready_initiator = team
+    bp.ready_remaining = 20
+    broadcast()
+
+    def c_countdown():
+        for i in range(20, 0, -1):
+            bp.ready_remaining = i
+            if bp.ready_phase != 'waiting_confirm':
+                return
+            broadcast()
+            socketio.sleep(1)
+        if bp.ready_phase == 'waiting_confirm':
+            bp.ready_phase = 'awaiting_start'
+            bp.ready_initiator = 0
+            bp.ready_remaining = 0
+            broadcast()
+
+    socketio.start_background_task(c_countdown)
+
+
+@socketio.on('confirm_start')
+def on_confirm_start(data):
+    """Player/captain confirms (or cancels) the start request."""
+    sid = request.sid
+    confirm = data.get('confirm', False)
+
+    # Resolve team from SID (captain mode or team mode)
+    team = bp.get_captain_team(sid) or bp.get_player_team(sid)
+    if not team:
+        emit('error', {'message': 'You are not on a team'})
+        return
+
+    # ── Team mode: ready voting ──
+    if bp.ready_phase == 'ready_voting':
+        if sid not in bp.ready_confirmations:
+            emit('error', {'message': 'You are not in the ready pool'})
+            return
+        if team == bp.ready_initiator:
+            # Initiating team: player can toggle their confirmation
+            bp.ready_confirmations[sid] = confirm
+        else:
+            # Other team: player can toggle their confirmation
+            bp.ready_confirmations[sid] = confirm
+
+        # Check if anyone explicitly cancelled
+        if not confirm:
+            # Anyone cancels → abort entirely
+            bp.ready_phase = 'awaiting_start'
+            bp.ready_initiator = 0
+            bp.ready_remaining = 0
+            bp.ready_confirmations = {}
+            broadcast()
+            return
+
+        # Count confirmations per team — every connected player must accept
+        t1_players = bp.team1_players if bp.ready_initiator == 1 else bp.team2_players
+        t2_players = bp.team2_players if bp.ready_initiator == 1 else bp.team1_players
+        init_ready = sum(1 for p in t1_players if bp.ready_confirmations.get(p['sid']) == True)
+        other_ready = sum(1 for p in t2_players if bp.ready_confirmations.get(p['sid']) == True)
+        init_total = len(t1_players)
+        other_total = len(t2_players)
+
+        # All players from both teams must accept
+        if init_ready >= init_total and other_ready >= other_total:
+            bp.ready_phase = 'none'
+            bp.ready_initiator = 0
+            bp.ready_remaining = 0
+            bp.ready_confirmations = {}
+            bp.start_bp()
+        # else: not enough yet, just broadcast update
+
+        broadcast()
+        return
+
+    # ── Captain mode: simple confirm flow ──
+    if bp.ready_phase != 'waiting_confirm':
+        emit('error', {'message': 'No pending start request'})
+        return
+    if team == bp.ready_initiator:
+        # Initiator can cancel, but cannot confirm themselves
+        if confirm:
+            emit('error', {'message': 'Wait for the other captain to accept'})
+            return
+        # Cancel by initiator — abort
+        bp.ready_phase = 'awaiting_start'
+        bp.ready_initiator = 0
+        bp.ready_remaining = 0
+        broadcast()
+        return
+
+    if confirm:
+        bp.ready_phase = 'none'
+        bp.ready_initiator = 0
+        bp.ready_remaining = 0
+        bp.start_bp()
+    else:
+        bp.ready_phase = 'awaiting_start'
+        bp.ready_initiator = 0
+        bp.ready_remaining = 0
+
+    broadcast()
+
+
 @socketio.on('disconnect')
 def on_disconnect():
     sid = request.sid
@@ -571,27 +822,70 @@ def on_disconnect():
         bp.team2_players = [p for p in bp.team2_players if p['sid'] != sid]
         if bp.captain_sid[team] == sid:
             bp.captain_sid[team] = None
-    # Clean votes
+    # Clean votes and ready confirmations
     bp.votes.pop(sid, None)
+    bp.ready_confirmations.pop(sid, None)
+    # Reset ready state if a team can no longer act
+    if bp.ready_phase != 'none':
+        if (bp.entry_mode == 'captain' and (not bp.captain_sid[1] or not bp.captain_sid[2])) \
+           or (bp.entry_mode == 'team' and (len(bp.team1_players) == 0 or len(bp.team2_players) == 0)):
+            bp.ready_phase = 'none'
+            bp.ready_initiator = 0
+            bp.ready_remaining = 0
+            bp.ready_confirmations = {}
     broadcast()
 
-# ── Serve static frontend ───────────────────────────────────────────────
+# ── Serve static frontend and map images ─────────────────────────────────
 @app.route('/')
 def index():
     return send_from_directory('.', 'RealtimeBP.html')
 
+@app.route('/res/<path:filename>')
+def serve_res(filename):
+    return send_from_directory(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'res'), filename)
+
 # ── Main ─────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    import socketio as sio_module
-    # Need request context for sid
     from flask import request
+
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    # cert is at C:\Users\a233d\Documents\cert (two levels up from git\cs2-hud-matchless)
+    CERT_DIR = os.path.join(os.path.dirname(os.path.dirname(BASE_DIR)), 'cert')
+    cert_file = os.path.join(CERT_DIR, 'az7627.top.pem')
+    key_file = os.path.join(CERT_DIR, 'az7627.top.key')
+
     print("═══ CS2 Real-time BP Server ═══")
     print(f"Config: {CONFIG_PATH}")
     print(f"BO{config['bo']} | Mode: {config['entry_mode']}")
     print(f"Teams: {config['teams']['team1']['name']} vs {config['teams']['team2']['name']}")
     print(f"Maps: {', '.join(config['map_pool'])}")
     print()
-    print("Starting server at http://localhost:5000")
-    print("Press Ctrl+C to stop.")
-    print()
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        import eventlet
+        import socket
+        print(f"Starting HTTPS server at https://az7627.top:8443")
+        print("Press Ctrl+C to stop.")
+        print()
+        # Dual-stack IPv4+IPv6 — create socket manually to bypass
+        # getaddrinfo('::',…) which fails on some Windows configs.
+        try:
+            sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(('', 8443))
+            sock.listen(128)
+            ssl_listener = eventlet.wrap_ssl(
+                sock, certfile=cert_file, keyfile=key_file, server_side=True)
+            print("Listening on [::]:8443 (dual-stack IPv4+IPv6)")
+        except Exception as e:
+            print(f"Dual-stack failed ({e}), IPv4 only")
+            listener = eventlet.listen(('0.0.0.0', 8443))
+            ssl_listener = eventlet.wrap_ssl(
+                listener, certfile=cert_file, keyfile=key_file, server_side=True)
+            print("Listening on 0.0.0.0:8443 (IPv4 only)")
+        eventlet.wsgi.server(ssl_listener, app)
+    else:
+        print("Cert not found, starting HTTP at http://localhost:5000")
+        print("Press Ctrl+C to stop.")
+        print()
+        socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
