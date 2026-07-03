@@ -1,6 +1,6 @@
 # CS2 HUD Matchless
 
-A broadcast HUD toolkit for CS2 competitive matches, covering all **non-gameplay** presentation scenes — map ban/pick, pre-match countdown, halftime, between-maps, technical pause, post-match results, and more. Visual style is inspired by tier-1 events (PGL, BLAST), designed for 16:9 at 1920×1080 and above.
+A broadcast HUD toolkit for CS2 competitive matches, covering all **non-gameplay** presentation scenes — map ban/pick, pre-match countdown, halftime, between-maps, technical pause, post-match results, and more. Designed for 16:9 at 1920×1080 and above.
 
 > **Portions of this project were developed with AI assistance.**
 
