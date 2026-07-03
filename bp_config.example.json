@@ -1,5 +1,5 @@
 {
-    "_version": 2,
+    "_version": 3,
     "admin": {
         "password_hash": "ad76f0811b14eb3692be264611b55998d818fea463a1836d09194fcd2f168816",
         "salt": "73abf7c4803529d63db46cf5a0b5a243"
@@ -16,6 +16,15 @@
             "salt": "0ceec89c32754d33736add3c8f576784"
         }
     },
+    "ssl": {
+        "enable_https": false,
+        "cert_dir": "/path/to/cert",
+        "cert_file": "your_domain.pem",
+        "key_file": "your_domain.key",
+        "domain": "your_domain.com"
+    },
+    "http_port": 5000,
+    "https_port": 8443,
     "map_pool": [
         "de_dust2",
         "de_mirage",

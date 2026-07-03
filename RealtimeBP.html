@@ -92,6 +92,7 @@
         .map-card.clickable:hover{border-color:var(--border-light);box-shadow:0 0 12px rgba(255,255,255,.03)}
         .map-card.clickable.t1-hover:hover{border-color:var(--t1-blue);box-shadow:0 0 20px var(--t1-glow)}
         .map-card.clickable.t2-hover:hover{border-color:var(--t2-orange);box-shadow:0 0 20px var(--t2-glow)}
+        .map-card.my-vote{border-color:var(--accent-gold);box-shadow:0 0 12px rgba(255,215,0,.15)}
         .map-card.pick-anim{animation:pickPulse .6s ease}
         @keyframes pickPulse{0%{transform:scale(1)}50%{transform:scale(1.02);border-color:var(--accent-green)}100%{transform:scale(1)}}
         @keyframes mapReveal{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
@@ -185,6 +186,8 @@
         .modal-cancel:hover{color:var(--text-secondary)}
         .modal-hint{font-size:clamp(.45rem,.55vw,.65rem);color:var(--text-muted);margin-bottom:.5em}
 
+
+
         /* ── Responsive ── */
         @media(max-width:768px){
             .screen{padding:1.5vh 3vw}
@@ -201,7 +204,7 @@
             <div class="top-bar">
                 <button class="admin-btn" id="adminBtn"><i class="fa-solid fa-gear"></i> Admin</button>
                 <div class="bp-title">BAN & <span class="hl">PICK</span></div>
-                <div class="bo-badge" id="boBadge">BO3</div>
+                <div class="bo-badge" id="boBadge"></div>
             </div>
 
             <!-- Teams -->
@@ -283,6 +286,11 @@
             if (e.target === modal) closeModal();
         });
 
+        function showNotification(msg) {
+            openModal('Notice', `<p style="color:var(--text-secondary)">${msg}</p>
+                <div class="modal-actions"><button class="modal-btn gray" onclick="closeModal()">OK</button></div>`);
+        }
+
         // ── State update ───────────────────────────────────────────────
         socket.on('state_update', data => {
             state = data;
@@ -290,7 +298,7 @@
         });
 
         socket.on('error', data => {
-            if (data && data.message) alert(data.message);
+            if (data && data.message) showNotification(data.message);
         });
 
         socket.on('admin_login_result', data => {
@@ -299,12 +307,12 @@
                 closeModal();
                 showAdminPanel();
             } else {
-                alert('Wrong password');
+                showNotification('Wrong password');
             }
         });
 
         socket.on('admin_update_result', data => {
-            if (data.success) closeModal();
+            if (data.success) { closeModal(); showNotification('Settings saved'); }
         });
 
         socket.on('team_entry_result', data => {
@@ -313,6 +321,8 @@
                 myRole = data.role;
                 myName = data.name || '';
                 closeModal();
+            } else {
+                showNotification(data.error || 'Entry failed');
             }
         });
 
@@ -421,7 +431,10 @@
                             $('voteSideTBtn').onclick = function(){ socket.emit('action', { map_id: 't' }); };
                         } else {
                             var al = state.current_action === 'ban' ? 'BAN' : 'PICK';
-                            $('turnPanelText').innerHTML = 'VOTE: ' + al;
+                            var need = state.remaining_in_step || 1;
+                            var have = getMyVoteMaps().length;
+                            var hint = need > 1 ? ' (' + have + '/' + need + ')' : '';
+                            $('turnPanelText').innerHTML = 'VOTE: ' + al + hint;
                             $('voteTimer').textContent = state.vote_remaining + 's';
                         }
                     } else if (state.entry_mode === 'captain') {
@@ -508,6 +521,10 @@
                     classes += ' clickable';
                     classes += state.current_team === 1 ? ' t1-hover' : ' t2-hover';
                 }
+                const myMaps = getMyVoteMaps();
+                if (myMaps.includes(mapId)) {
+                    classes += ' my-vote';
+                }
 
                 // Right-side tags
                 let tags = '';
@@ -590,23 +607,29 @@
         function getVotersFor(mapId) {
             if (!state || !state.votes) return [];
             return Object.entries(state.votes)
-                .filter(([_, v]) => v.map_id === mapId)
+                .filter(([_, v]) => v.map_ids && v.map_ids.includes(mapId))
                 .map(([sid, v]) => ({ sid, name: v.voter_name || '?', team: v.team }));
+        }
+
+        function getMyVoteMaps() {
+            if (!state || !state.votes) return [];
+            const v = state.votes[mySid];
+            return v ? (v.map_ids || []) : [];
         }
 
         function getSideVotersFor(side) {
             if (!state || !state.votes || state.current_action !== 'side') return [];
             const team = state.current_team;
             return Object.entries(state.votes)
-                .filter(([_, v]) => v.map_id === side && v.action === 'side' && v.team === team)
+                .filter(([_, v]) => v.map_ids && v.map_ids.includes(side) && v.action === 'side' && v.team === team)
                 .map(([sid, v]) => ({ sid, name: v.voter_name || '?', team: v.team }));
         }
 
         function getMySideVote() {
             if (!state || !state.votes) return null;
             const v = state.votes[mySid];
-            if (!v || v.action !== 'side') return null;
-            return v.map_id;  // 'ct' or 't'
+            if (!v || v.action !== 'side' || !v.map_ids) return null;
+            return v.map_ids[0];  // 'ct' or 't'
         }
 
         // ── Captain ready / team vote display helpers ─────────────────
@@ -806,10 +829,6 @@
                 const t2p = $('admT2Pwd')?.value?.trim();
                 if (t2p) updates.team2_password = t2p;
 
-                // Need to re-authenticate - use stored password? Actually admin is already authed in session
-                // We'll store the admin password in the session
-                socket.emit('admin_update', { password: '', updates });
-                // Actually we need to send the admin password. Let's prompt.
                 openModal('Confirm Admin Password', `
                     <input class="modal-input" type="password" id="admConfirmPwd" placeholder="Admin password" />
                     <div class="modal-actions">
@@ -862,8 +881,14 @@
         $('team2Enter').addEventListener('click', () => enterTeam(2));
 
         function enterTeam(team) {
-            const label = team === 1 ? state?.team1_name || 'Team 1' : state?.team2_name || 'Team 2';
-            const isTeamMode = state?.entry_mode === 'team';
+            if (!state) {
+                const wait = setInterval(() => {
+                    if (state) { clearInterval(wait); enterTeam(team); }
+                }, 50);
+                return;
+            }
+            const label = team === 1 ? state.team1_name : state.team2_name;
+            const isTeamMode = state.entry_mode === 'team';
 
             if (isTeamMode) {
                 openModal(`Enter ${label}`, `
@@ -879,7 +904,7 @@
                 $('enterConfirm').addEventListener('click', () => {
                     const name = $('enterName')?.value?.trim() || '';
                     const pwd = $('enterPwd')?.value || '';
-                    if (!name) { alert('Name is required'); return; }
+                    if (!name) { showNotification('Name is required'); return; }
                     socket.emit('enter_team', { team, password: pwd, name });
                 });
             } else {

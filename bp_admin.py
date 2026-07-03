@@ -39,6 +39,7 @@ def set_password_section(label, section):
     return section
 
 def show_status(cfg):
+    ssl = cfg.get('ssl', {})
     print("\n═══════════ Current Config ═══════════")
     print(f"  Admin password:   {'✔ set' if cfg['admin']['password_hash'] else '✘ NOT SET'}")
     print(f"  Team 1 [{cfg['teams']['team1']['name']}]: {'✔ set' if cfg['teams']['team1']['password_hash'] else '✘ NOT SET'}")
@@ -48,6 +49,13 @@ def show_status(cfg):
     print(f"  Entry mode:       {cfg['entry_mode']}")
     print(f"  Team 1 name:      {cfg['teams']['team1']['name']}")
     print(f"  Team 2 name:      {cfg['teams']['team2']['name']}")
+    print(f"  HTTPS:            {'ON' if ssl.get('enable_https') else 'OFF'}")
+    print(f"  HTTP port:        {cfg.get('http_port', 5000)}")
+    print(f"  HTTPS port:       {cfg.get('https_port', 8443)}")
+    print(f"  Cert dir:         {ssl.get('cert_dir', '/path/to/cert')}")
+    print(f"  Cert file:        {ssl.get('cert_file', 'cert.pem')}")
+    print(f"  Key file:         {ssl.get('key_file', 'cert.key')}")
+    print(f"  Domain:           {ssl.get('domain', 'localhost')}")
     print("════════════════════════════════════\n")
 
 def main():
@@ -65,7 +73,14 @@ def main():
     print("  4  Set map pool (comma-separated IDs)")
     print("  5  Set BO (1 / 3 / 5)")
     print("  6  Set entry mode (captain / team)")
-    print("  7  Show full JSON")
+    print("  7  Toggle HTTPS on/off")
+    print("  8  Set HTTP port")
+    print("  9  Set HTTPS port")
+    print("  10 Set SSL certificate directory")
+    print("  11 Set SSL cert file name")
+    print("  12 Set SSL key file name")
+    print("  13 Set SSL domain")
+    print("  14 Show full JSON")
     print("  0  Exit")
     print()
 
@@ -125,6 +140,67 @@ def main():
                 print("  ✘ Must be 'captain' or 'team'.")
 
         elif ch == '7':
+            ssl = cfg.setdefault('ssl', {})
+            ssl['enable_https'] = not ssl.get('enable_https', False)
+            status = 'ON' if ssl['enable_https'] else 'OFF'
+            print(f"  → HTTPS: {status}")
+            save_config(cfg)
+
+        elif ch == '8':
+            val = input(f"HTTP port [{cfg.get('http_port', 5000)}]: ").strip()
+            if val.isdigit():
+                cfg['http_port'] = int(val)
+                print(f"  → HTTP port: {val}")
+                save_config(cfg)
+            else:
+                print("  ✘ Must be a number.")
+
+        elif ch == '9':
+            val = input(f"HTTPS port [{cfg.get('https_port', 8443)}]: ").strip()
+            if val.isdigit():
+                cfg['https_port'] = int(val)
+                print(f"  → HTTPS port: {val}")
+                save_config(cfg)
+            else:
+                print("  ✘ Must be a number.")
+
+        elif ch == '10':
+            ssl = cfg.setdefault('ssl', {})
+            current = ssl.get('cert_dir', '/path/to/cert')
+            val = input(f"Cert directory [{current}]: ").strip()
+            if val:
+                ssl['cert_dir'] = val
+                print(f"  → Cert dir: {val}")
+                save_config(cfg)
+
+        elif ch == '11':
+            ssl = cfg.setdefault('ssl', {})
+            current = ssl.get('cert_file', 'cert.pem')
+            val = input(f"Cert file name [{current}]: ").strip()
+            if val:
+                ssl['cert_file'] = val
+                print(f"  → Cert file: {val}")
+                save_config(cfg)
+
+        elif ch == '12':
+            ssl = cfg.setdefault('ssl', {})
+            current = ssl.get('key_file', 'cert.key')
+            val = input(f"Key file name [{current}]: ").strip()
+            if val:
+                ssl['key_file'] = val
+                print(f"  → Key file: {val}")
+                save_config(cfg)
+
+        elif ch == '13':
+            ssl = cfg.setdefault('ssl', {})
+            current = ssl.get('domain', 'localhost')
+            val = input(f"Domain [{current}]: ").strip()
+            if val:
+                ssl['domain'] = val
+                print(f"  → Domain: {val}")
+                save_config(cfg)
+
+        elif ch == '14':
             print(json.dumps(cfg, indent=4))
 
         elif ch == '0':
