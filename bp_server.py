@@ -519,6 +519,10 @@ class BPState:
                 return
             counts = Counter(all_map_votes)
             chosen = self._top_n_with_tiebreak(counts, min(need, len(self.available)))
+            if len(chosen) < need:
+                remaining = [m for m in self.available if m not in chosen]
+                extra = random.sample(remaining, min(need - len(chosen), len(remaining)))
+                chosen.extend(extra)
             self._apply_multiple(chosen, self.current_acting)
             self.votes = {}
             return
@@ -767,6 +771,7 @@ def on_reset_state(data):
         emit('error', {'message': 'Admin auth failed'})
         return
     bp.reset()
+    socketio.emit('bp_reset')
     broadcast()
 
 @socketio.on('request_start')
