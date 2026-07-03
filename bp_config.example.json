@@ -19,9 +19,9 @@
     "ssl": {
         "enable_https": false,
         "cert_dir": "/path/to/cert",
-        "cert_file": "your_domain.pem",
-        "key_file": "your_domain.key",
-        "domain": "your_domain.com"
+        "cert_file": "localhost.pem",
+        "key_file": "localhost.key",
+        "domain": "localhost"
     },
     "http_port": 5000,
     "https_port": 8443,
