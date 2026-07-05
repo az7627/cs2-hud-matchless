@@ -95,6 +95,8 @@ python bp_admin.py
 ├── bp_admin.py          # BP 配置管理 CLI
 ├── bp_config.json       # BP 服务器配置（自动生成）
 ├── bp_config.example.json # 配置文件样例
+├── css/                 # 独立样式文件
+├── js/                  # 独立脚本文件
 ├── res/                 # 地图图片等静态资源
 └── readme_snapshot/     # README 截图
 ```

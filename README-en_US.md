@@ -95,6 +95,8 @@ Open the real-time BP page, click the **Admin** button in the top-left corner, a
 ├── bp_admin.py          # BP configuration CLI
 ├── bp_config.json       # BP server config (auto-generated)
 ├── bp_config.example.json # Example configuration file
+├── css/                 # Standalone stylesheets
+├── js/                  # Standalone scripts
 ├── res/                 # Map images and static assets
 └── readme_snapshot/     # README screenshots
 ```
