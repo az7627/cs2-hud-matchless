@@ -957,13 +957,23 @@ def on_disconnect():
     broadcast()
 
 # ── Serve static frontend and map images ─────────────────────────────────
+ROOT = os.path.dirname(os.path.abspath(__file__))
+
 @app.route('/')
 def index():
-    return send_from_directory('.', 'RealtimeBP.html')
+    return send_from_directory(ROOT, 'RealtimeBP.html')
+
+@app.route('/css/<path:filename>')
+def serve_css(filename):
+    return send_from_directory(os.path.join(ROOT, 'css'), filename)
+
+@app.route('/js/<path:filename>')
+def serve_js(filename):
+    return send_from_directory(os.path.join(ROOT, 'js'), filename)
 
 @app.route('/res/<path:filename>')
 def serve_res(filename):
-    return send_from_directory(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'res'), filename)
+    return send_from_directory(os.path.join(ROOT, 'res'), filename)
 
 # ── Main ─────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
